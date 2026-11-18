@@ -1,0 +1,21 @@
+{
+  "name": "AIS86 Lab S12 - Rompe la arquitectura",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/kubectl-helm-minikube:1": {
+      "version": "latest",
+      "helm": "none",
+      "minikube": "none"
+    },
+    "ghcr.io/devcontainers-extra/features/kind:1": {}
+  },
+  "forwardPorts": [8000, 8080, 8090, 30080],
+  "portsAttributes": {
+    "8000": { "label": "API (Parte A - Contenedor solo)" },
+    "8080": { "label": "Monitor + nginx LB (Parte B)" },
+    "8090": { "label": "Monitor standalone (Parte C / AWS)" },
+    "30080": { "label": "Kubernetes NodePort Service (Parte C)" }
+  },
+  "postCreateCommand": "docker build -t lab-fallas:1.0 ./app"
+}

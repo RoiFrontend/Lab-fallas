@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor de réplicas · Lab S12</title>
+<style>
+  :root{--bg:#14161f;--card:#1e2130;--line:#2e3348;--txt:#e8eaf2;--dim:#9aa0b8;--bad:#ff5c6c;--good:#3ddc97}
+  @media (prefers-color-scheme: light){:root{--bg:#f6f7fb;--card:#fff;--line:#d9dce8;--txt:#1a1d29;--dim:#5b6178;--bad:#d62f43;--good:#139a5e}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,Segoe UI,sans-serif}
+  main{max-width:1200px;margin:0 auto;padding:20px 16px}
+  h1{font-size:26px;margin:0 0 4px} .dim{color:var(--dim)}
+  .bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:14px 0}
+  input,select,button{font-size:16px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--txt)}
+  input{min-width:280px;flex:1}
+  button{cursor:pointer;font-weight:600}
+  button.go{background:#4c7dff;border-color:#4c7dff;color:#fff}
+  button.warn{border-color:#e0a030} button.bad{border-color:var(--bad)}
+  .tiles{display:grid;grid-template-columns:repeat(40,1fr);gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .tile{aspect-ratio:1;border-radius:4px;background:var(--line)}
+  .tile.err{background:var(--bad)!important}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-top:14px}
+  @media (max-width:800px){.grid{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(20,1fr)}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th,td{text-align:left;padding:7px 6px;border-bottom:1px solid var(--line)}
+  .dot{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:middle;margin-right:6px}
+  pre{white-space:pre-wrap;font-size:13px;margin:0;color:var(--dim)}
+  .big{font-size:30px;font-weight:800}
+</style>
+</head>
+<body>
+<main>
+  <h1>Monitor de réplicas</h1>
+  <div class="dim">Cada cuadrito es una petición. El color dice qué réplica respondió. Rojo = error.</div>
+  <div class="bar">
+    <input id="target" aria-label="URL del servicio">
+    <label class="dim">Peticiones simultáneas
+      <select id="conc"><option>1</option><option selected>4</option><option>8</option></select></label>
+    <button class="go" id="play">▶ Iniciar</button>
+    <button id="clear">Limpiar</button>
+  </div>
+  <div class="bar">
+    <button class="bad" id="crash">💥 Tumbar una réplica (POST /crash)</button>
+    <button class="warn" id="slow">🐢 Volver lenta / normal una réplica (POST /lento)</button>
+  </div>
+  <div class="tiles" id="tiles"></div>
+  <div class="grid">
+    <div class="card">
+      <table><thead><tr><th>Réplica</th><th>Atendidas</th><th>Latencia prom.</th><th>Último contador</th><th>Versión</th></tr></thead><tbody id="tbl"></tbody></table>
+    </div>
+    <div class="card">
+      <div class="dim">Errores</div><div class="big" id="errs" style="color:var(--bad)">0</div>
+      <div class="dim" style="margin-top:8px">Total</div><div class="big" id="total">0</div>
+      <div class="dim" style="margin-top:8px">Última respuesta</div><pre id="last">—</pre>
+    </div>
+  </div>
+</main>
+<script>
+(function(){
+  var COLORS=['#4c7dff','#ffb020','#2ec4b6','#c86bfa','#f25f9a','#8bd450','#ff8a3d','#38bdf8'];
+  var T=document.getElementById('target');
+  // Parte B: el monitor lo sirve nginx en :8080 junto a la API (/api/).
+  // Parte C: se sirve solo en :8090 y apunta al Service de Kubernetes (:30080).
+  var def = location.port === '8080' ? location.origin + '/api/' : 'http://localhost:30080/';
+  try{ T.value = localStorage.getItem('lab-target') || def; }catch(e){ T.value=def; }
+  T.addEventListener('change',function(){try{localStorage.setItem('lab-target',T.value);}catch(e){}});
+  var tiles=document.getElementById('tiles'), N=400;
+  for(var i=0;i<N;i++){var d=document.createElement('div');d.className='tile';tiles.appendChild(d);}
+  var pos=0, reps={}, order=[], errs=0, total=0, running=false;
+  function url(p){var b=T.value.trim(); if(b.slice(-1)!=='/')b+='/'; return b+(p||'');}
+  function color(r){if(!(r in reps)){reps[r]={n:0,ms:0,c:'',v:'',col:COLORS[order.length%COLORS.length]};order.push(r);}return reps[r].col;}
+  function paint(t,ok,col){var el=tiles.children[pos%N]; el.className='tile'+(ok?'':' err'); el.style.background=ok?col:''; pos++;
+    var nx=tiles.children[pos%N]; nx.className='tile'; nx.style.background='';}
+  function table(){document.getElementById('tbl').innerHTML=order.map(function(r){var x=reps[r];
+      return '<tr><td><span class="dot" style="background:'+x.col+'"></span>'+r+'</td><td>'+x.n+'</td><td>'+(x.n?Math.round(x.ms/x.n):0)+' ms</td><td>'+x.c+'</td><td>'+x.v+'</td></tr>';}).join('');
+    document.getElementById('errs').textContent=errs; document.getElementById('total').textContent=total;}
+  function one(){
+    if(!running)return;
+    var t0=performance.now();
+    var ctl=new AbortController(); var to=setTimeout(function(){ctl.abort();},6000);
+    fetch(url(''),{cache:'no-store',signal:ctl.signal}).then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status); return r.json();
+    }).then(function(j){
+      var ms=performance.now()-t0, col=color(j.replica), x=reps[j.replica];
+      x.n++; x.ms+=ms; x.c=j.contador+' ('+j.contador_en+')'; x.v=j.version+(j.lento?' · lenta':'');
+      total++; paint(ms,true,col); document.getElementById('last').textContent=JSON.stringify(j,null,1);
+    }).catch(function(e){ errs++; total++; paint(0,false); document.getElementById('last').textContent='ERROR: '+e.message;
+    }).finally(function(){clearTimeout(to); table(); setTimeout(one,120);});
+  }
+  document.getElementById('play').addEventListener('click',function(){
+    running=!running; this.textContent=running?'⏸ Pausar':'▶ Iniciar';
+    if(running){var c=+document.getElementById('conc').value; for(var k=0;k<c;k++) one();}
+  });
+  document.getElementById('clear').addEventListener('click',function(){reps={};order=[];errs=0;total=0;pos=0;
+    [].forEach.call(tiles.children,function(t){t.className='tile';t.style.background='';}); table();});
+  function post(p){fetch(url(p),{method:'POST'}).then(function(r){return r.text();}).then(function(t){document.getElementById('last').textContent='POST /'+p+' → '+(t||'(sin respuesta: la réplica murió)');})
+    .catch(function(e){document.getElementById('last').textContent='POST /'+p+' → '+e.message+' (normal si la réplica murió)';});}
+  document.getElementById('crash').addEventListener('click',function(){post('crash');});
+  document.getElementById('slow').addEventListener('click',function(){post('lento');});
+})();
+</script>
+</body>
+</html>

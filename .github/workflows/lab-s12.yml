@@ -1,0 +1,153 @@
+name: Lab S12 - Rompe la arquitectura (Partes A, B y C)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  parte-a-y-b-docker:
+    name: Partes A y B (Docker + Compose + nginx + Redis)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: A1 - Construir imagen y ejecutar contenedor único
+        run: |
+          docker build -t lab-fallas:1.0 ./app
+          docker run -d -p 8000:8000 --name solo lab-fallas:1.0
+          sleep 2
+          for i in 1 2 3; do curl -s http://localhost:8000/; echo; done
+
+      - name: A2 - Romper contenedor único (SPOF)
+        run: |
+          curl -sS -X POST http://localhost:8000/crash || true
+          sleep 1
+          docker ps -a --filter "name=^/solo$"
+          docker rm -f solo
+
+      - name: A3 - Política de reinicio (--restart unless-stopped) y pérdida de estado en memoria
+        run: |
+          docker run -d -p 8000:8000 --restart unless-stopped --name solo lab-fallas:1.0
+          sleep 2
+          echo "Antes del crash:"
+          for i in 1 2 3; do curl -s http://localhost:8000/; echo; done
+          curl -sS -X POST http://localhost:8000/crash || true
+          sleep 3
+          docker ps --filter "name=^/solo$"
+          echo "Después del reinicio (contador reiniciado):"
+          curl -s http://localhost:8000/; echo
+          docker rm -f solo
+
+      - name: B1 y B2 - 3 réplicas detrás de nginx (bueno vs defectuoso)
+        run: |
+          docker compose up -d
+          sleep 3
+          docker compose ps
+          echo "=== B1: Round Robin en 3 réplicas ==="
+          for i in $(seq 1 6); do curl -s http://localhost:8080/api/; echo; done
+
+          echo "=== B2(a): Matar api-2 con nginx.conf (0 errores) ==="
+          docker kill lab-fallas-api-2
+          sleep 1
+          ok=0; err=0
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/)
+            if [ "$code" = "200" ]; then ok=$((ok+1)); else err=$((err+1)); fi
+          done
+          echo "nginx bueno -> OK=$ok, Errores=$err"
+          test "$err" -eq 0
+
+          echo "=== B2(b): Matar api-2 con nginx-defectuoso.conf (errores 502/504) ==="
+          docker start lab-fallas-api-2
+          sleep 2
+          NGINX_CONF=nginx-defectuoso.conf docker compose up -d --force-recreate lb
+          sleep 2
+          docker kill lab-fallas-api-2
+          sleep 1
+          ok=0; err=0
+          for i in $(seq 1 12); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/)
+            if [ "$code" = "200" ]; then ok=$((ok+1)); else err=$((err+1)); fi
+          done
+          echo "nginx defectuoso -> OK=$ok, Errores=$err"
+          test "$err" -gt 0
+
+          echo "Restaurando nginx bueno..."
+          docker start lab-fallas-api-2
+          sleep 2
+          docker compose up -d --force-recreate lb
+          sleep 2
+
+      - name: B3 - Estado compartido en Redis
+        run: |
+          REDIS_URL=redis://redis:6379/0 docker compose up -d api
+          sleep 3
+          docker compose restart lb
+          sleep 2
+          echo "=== B3: Contador compartido en Redis ==="
+          for i in $(seq 1 6); do curl -s http://localhost:8080/api/; echo; done
+          docker compose down
+
+  parte-c-kubernetes:
+    name: Parte C (Kubernetes con kind - 3 nodos)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar kind y construir imagen
+        run: |
+          curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.27.0/kind-linux-amd64
+          chmod +x ./kind
+          sudo mv ./kind /usr/local/bin/kind
+          docker build -t lab-fallas:1.0 ./app
+
+      - name: C1 y C2 - Crear clúster kind de 3 nodos y desplegar app
+        run: |
+          kind create cluster --config k8s/kind-cluster.yaml
+          kubectl get nodes -o wide
+          kind load docker-image lab-fallas:1.0 --name ais86
+          kubectl apply -f k8s/app.yaml
+          kubectl rollout status deployment/api --timeout=120s
+          kubectl get pods -o wide
+          for i in $(seq 1 6); do curl -s http://localhost:30080/; echo; done
+
+      - name: C3, C4 y C5 - Borrar pod, crash y escalar a 5
+        run: |
+          echo "=== C3: Borrar pod ==="
+          POD=$(kubectl get pods -l app=api -o jsonpath='{.items[0].metadata.name}')
+          kubectl delete pod "$POD"
+          kubectl rollout status deployment/api --timeout=60s
+          kubectl get pods -o wide
+
+          echo "=== C4: POST /crash ==="
+          curl -sS -X POST http://localhost:30080/crash || true
+          sleep 5
+          kubectl get pods -o wide
+
+          echo "=== C5: Escalar a 5 réplicas ==="
+          kubectl scale deployment api --replicas=5
+          kubectl rollout status deployment/api --timeout=90s
+          kubectl get pods -o wide
+
+      - name: C7 y C8 - Despliegue roto (ROMPER_HEALTH=1), rollback y limpieza
+        run: |
+          kubectl scale deployment api --replicas=3
+          kubectl rollout status deployment/api --timeout=60s
+          kubectl set env deployment/api ROMPER_HEALTH=1
+          sleep 30
+          kubectl get pods -o wide
+          ok=0; err=0
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:30080/)
+            if [ "$code" = "200" ]; then ok=$((ok+1)); else err=$((err+1)); fi
+          done
+          echo "Tráfico durante despliegue roto -> OK=$ok, Errores=$err"
+          test "$err" -eq 0
+          kubectl rollout undo deployment/api
+          kubectl rollout status deployment/api --timeout=90s
+          kind delete cluster --name ais86

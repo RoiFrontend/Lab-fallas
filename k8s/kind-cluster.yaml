@@ -1,0 +1,12 @@
+# Clúster local de 3 nodos (cada "nodo" es un contenedor Docker):
+#   kind create cluster --config k8s/kind-cluster.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: ais86
+nodes:
+  - role: control-plane          # el "cerebro": API, planificador, controladores
+    extraPortMappings:
+      - containerPort: 30080     # NodePort del Service → http://localhost:30080
+        hostPort: 30080
+  - role: worker                 # máquina de trabajo 1
+  - role: worker                 # máquina de trabajo 2

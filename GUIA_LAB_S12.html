@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Guía Lab S12 · Rompe la arquitectura · AIS86</title>
+<style>
+  @page{size:A4;margin:16mm 15mm}
+  body{font-family:"Segoe UI",system-ui,sans-serif;font-size:11pt;line-height:1.45;color:#1b1e2b;margin:0 auto;max-width:820px;padding:16px}
+  h1{font-size:22pt;margin:0 0 4px;color:#1d3b8f}
+  h2{font-size:15pt;margin:22px 0 6px;color:#1d3b8f;border-bottom:2px solid #1d3b8f;padding-bottom:3px;break-after:avoid}
+  h3{font-size:12pt;margin:14px 0 4px;break-after:avoid}
+  .sub{color:#555;margin-bottom:10px}
+  pre{background:#f1f3f8;border:1px solid #d6dbe8;border-radius:6px;padding:7px 10px;font-family:Consolas,monospace;font-size:9.5pt;white-space:pre-wrap;break-inside:avoid;margin:6px 0}
+  code{font-family:Consolas,monospace;font-size:9.5pt;background:#f1f3f8;padding:0 3px;border-radius:3px}
+  .ver{border-left:4px solid #139a5e;background:#eefaf3;padding:6px 10px;margin:6px 0;break-inside:avoid}
+  .por{border-left:4px solid #1d3b8f;background:#eef2fc;padding:6px 10px;margin:6px 0;break-inside:avoid}
+  .ojo{border-left:4px solid #d08b00;background:#fff7e6;padding:6px 10px;margin:6px 0;break-inside:avoid}
+  table{width:100%;border-collapse:collapse;margin:6px 0;font-size:10pt;break-inside:avoid}
+  th,td{border:1px solid #c9cfdd;padding:5px 7px;text-align:left;vertical-align:top}
+  th{background:#e7ebf5}
+  .box{border:1px solid #c9cfdd;border-radius:8px;padding:8px 12px;margin:8px 0}
+  .pb{break-before:page}
+  ol li,ul li{margin:2px 0}
+</style>
+</head>
+<body>
+
+<h1>Laboratorio S12 · Rompe la arquitectura</h1>
+<div class="sub">AIS86 Arquitectura de Software · UNAMBA · Contenedores, balanceo de carga, orquestador y clúster · 90 min, en equipo</div>
+
+<div class="box">
+<b>La idea de hoy.</b> No vamos a escribir mucho código: eso ya lo hace su agente de IA. Vamos a <b>ver fallar</b> una arquitectura y a <b>ver qué pieza la salva</b>.
+<ul>
+<li>Cada experimento sigue tres pasos: <b>romper</b>, <b>observar</b> en el monitor visual y <b>explicar</b> qué pieza lo resolvió.</li>
+<li>Lo que se califica es la explicación con evidencia (capturas), no el código.</li>
+</ul>
+</div>
+
+<h2>Las 4 piezas en una línea cada una</h2>
+<table>
+<tr><th>Pieza</th><th>Qué es</th><th>Qué falla sin ella</th><th>Lo más usado hoy</th></tr>
+<tr><td><b>Contenedor</b></td><td>Tu servicio empaquetado con todo lo que necesita. Corre igual en cualquier máquina.</td><td>«En mi máquina sí funciona»</td><td>Docker / formato OCI (estándar)</td></tr>
+<tr><td><b>Balanceador</b></td><td>Reparte las peticiones entre varias copias (réplicas) del servicio.</td><td>Una sola copia = si muere, se cae todo</td><td>nginx, HAProxy, Envoy; en la nube, AWS ALB/NLB</td></tr>
+<tr><td><b>Orquestador</b></td><td>Mantiene el estado deseado («quiero 3 copias»): revive, mueve y actualiza contenedores solo.</td><td>Alguien tiene que levantar a mano lo que se cae</td><td><b>Kubernetes</b> (estándar de facto); en AWS también ECS</td></tr>
+<tr><td><b>Clúster</b></td><td>Varias máquinas (nodos) que el orquestador maneja como si fueran una.</td><td>Si la única máquina muere, muere todo</td><td>Kubernetes administrado: EKS, GKE, AKS</td></tr>
+</table>
+
+<h2>0. Preparación (antes de clase o en los primeros 10 min)</h2>
+<ol>
+<li><b>Docker Desktop</b> abierto. Comprueben con <code>docker version</code>: debe mostrar <i>Client</i> y <i>Server</i>.</li>
+<li><code>docker login</code> con su cuenta gratuita de Docker Hub. El aula sale a internet por una sola IP, y Docker Hub limita las descargas anónimas por IP.</li>
+<li>Instalar <b>kind</b> (para la Parte C). <code>kubectl</code> ya viene con Docker Desktop: si <code>kubectl version --client</code> responde, no lo instalen.
+<pre>winget install Kubernetes.kind
+# solo si kubectl no responde:  winget install Kubernetes.kubectl
+# cierren y vuelvan a abrir la terminal, luego:
+kind version
+kubectl version --client</pre>
+Si <code>winget</code> no existe en su Windows, descarguen <code>kind</code> desde la página oficial: <code>kind.sigs.k8s.io</code> → <i>Quick Start</i> → <i>Installing From Release Binaries</i>.</li>
+<li>La Parte C levanta 3 «máquinas» dentro de Docker: necesitan unos <b>4 GB de RAM libres</b>. Si la laptop no alcanza, hagan la Parte C en la laptop más potente del equipo.</li>
+<li>Copiar la carpeta <code>lab-fallas</code> a su repositorio del equipo y abrir una terminal <b>dentro</b> de ella.</li>
+</ol>
+
+<div class="por"><b>Qué hay en la carpeta:</b>
+<ul>
+<li><code>app/</code>: un servicio pequeño en Python con un Dockerfile de 6 pasos. Ábranlo y léanlo: cada paso está comentado.</li>
+<li><code>compose.yaml</code>: 3 réplicas + nginx + Redis.</li>
+<li><code>nginx/</code>: una configuración buena y una defectuosa.</li>
+<li><code>monitor/</code>: la página visual.</li>
+<li><code>k8s/</code>: el clúster y la app para Kubernetes.</li>
+</ul></div>
+
+<div class="por"><b>Qué hace el servicio:</b>
+<ul>
+<li><code>GET /</code> responde qué réplica atendió y un contador.</li>
+<li><code>GET /health</code> es el chequeo de salud.</li>
+<li><code>POST /crash</code> mata el proceso.</li>
+<li><code>POST /lento</code> vuelve lenta (2 s) a la réplica que lo recibe.</li>
+</ul></div>
+
+<h2>Parte A · Un contenedor solo (15 min)</h2>
+
+<h3>A1. Construir y ejecutar</h3>
+<pre>docker build -t lab-fallas:1.0 ./app
+docker run -d -p 8000:8000 --name solo lab-fallas:1.0</pre>
+<p>Abran <code>http://localhost:8000</code> y recarguen varias veces.</p>
+<div class="ver"><b>Deben ver:</b> siempre la misma <code>replica</code> y un <code>contador</code> que sube.</div>
+
+<h3>A2. Romperlo</h3>
+<pre>curl.exe -X POST http://localhost:8000/crash
+docker ps -a</pre>
+<div class="ver"><b>Deben ver:</b> <code>curl</code> responde <i>Empty reply from server</i> (el proceso murió antes de contestar), el contenedor aparece en estado <code>Exited (1)</code> y el navegador ya no responde.</div>
+<div class="por"><b>Por qué:</b> una sola copia es un <b>punto único de falla</b>.</div>
+
+<h3>A3. Política de reinicio</h3>
+<pre>docker rm solo
+docker run -d -p 8000:8000 --restart unless-stopped --name solo lab-fallas:1.0
+curl.exe -X POST http://localhost:8000/crash
+docker ps</pre>
+<div class="ver"><b>Deben ver:</b>
+<ul>
+<li>el contenedor vuelve solo en unos segundos;</li>
+<li>pero el <code>contador</code> <b>empezó de cero</b>.</li>
+</ul></div>
+<div class="por"><b>Por qué:</b> lo que vive en memoria del contenedor <b>muere con él</b>. Reiniciar no es lo mismo que no perder datos.</div>
+<pre>docker rm -f solo</pre>
+
+<h2>Parte B · Réplicas y balanceador (30 min)</h2>
+
+<h3>B1. Tres réplicas detrás de nginx</h3>
+<pre>docker compose up -d --build
+docker compose ps</pre>
+<p>Abran el <b>monitor</b> en <code>http://localhost:8080</code> y presionen <b>▶ Iniciar</b>.</p>
+<div class="ver"><b>Deben ver:</b> cuadritos de <b>3 colores</b> alternándose. Es nginx repartiendo en <i>round robin</i>.</div>
+
+<h3>B2. Matar una réplica: balanceador bien configurado vs. defectuoso</h3>
+<p><b>(a) Con la configuración buena.</b> Con el monitor corriendo:</p>
+<pre>docker kill lab-fallas-api-2</pre>
+<div class="ver"><b>Deben ver:</b> ese color desaparece y <b>no hay cuadritos rojos</b>. nginx reintentó en otra réplica (<code>proxy_next_upstream</code>) y la marcó como caída (<code>max_fails</code>).</div>
+
+<p><b>(b) Con la configuración defectuosa.</b> Primero levanten de nuevo la réplica y cambien de configuración, con las 3 vivas:</p>
+<pre>docker start lab-fallas-api-2
+# PowerShell:
+$env:NGINX_CONF="nginx-defectuoso.conf"; docker compose up -d lb
+# bash: NGINX_CONF=nginx-defectuoso.conf docker compose up -d lb</pre>
+<p>Limpien el monitor, inícienlo y vuelvan a matar la réplica:</p>
+<pre>docker kill lab-fallas-api-2</pre>
+<div class="ver"><b>Deben ver:</b> rojos constantes, más o menos 1 de cada 3 (error 504: nginx esperó 1 s a una réplica que ya no existe). Es el usuario recibiendo errores.</div>
+<p>Comparen <code>nginx/nginx.conf</code> con <code>nginx/nginx-defectuoso.conf</code>: ¿qué dos líneas cambian?</p>
+<p>Al terminar, restauren todo:</p>
+<pre># PowerShell:
+Remove-Item Env:NGINX_CONF; docker start lab-fallas-api-2; docker compose up -d --force-recreate lb
+# bash: unset NGINX_CONF; docker start lab-fallas-api-2; docker compose up -d --force-recreate lb</pre>
+<div class="ojo"><b>Observación de arquitectura:</b>
+<ul>
+<li>nginx averigua las IPs de las réplicas (<code>api</code>) <b>al arrancar</b>.</li>
+<li>Si una réplica vuelve con otra IP, nginx no se entera hasta que se reinicia. Por eso recreamos <code>lb</code>.</li>
+<li>Ese es el problema del <b>descubrimiento de servicios</b>, que un orquestador resuelve solo (Parte C).</li>
+</ul></div>
+
+<h3>B3. El defecto del estado en memoria</h3>
+<p>Miren la columna <b>Último contador</b> del monitor: cada réplica tiene <b>su propio</b> contador.</p>
+<div class="por"><b>Por qué importa:</b> si el contador fuera un carrito de compras, el usuario lo vería aparecer y desaparecer según la réplica que le toque.</div>
+<p>Arréglenlo moviendo el estado <b>fuera</b> del contenedor, a Redis:</p>
+<pre># PowerShell:
+$env:REDIS_URL="redis://redis:6379/0"; docker compose up -d api
+# bash: REDIS_URL=redis://redis:6379/0 docker compose up -d api
+docker compose restart lb</pre>
+<div class="ver"><b>Deben ver:</b> un solo contador que sube de forma continua, sin importar la réplica, con la indicación «redis (compartido)».</div>
+
+<h3>B4. Una réplica lenta: round robin vs. menos conexiones</h3>
+<ol>
+<li>En el monitor elijan <b>8 peticiones simultáneas</b> y presionen <b>🐢 Volver lenta una réplica</b>.</li>
+<li>Miren la latencia promedio: una réplica tarda unos 2000 ms, y aun así recibe 1/3 de las peticiones.</li>
+<li>En <code>nginx/nginx.conf</code> quiten el <code>#</code> de la línea <code># least_conn;</code>, guarden y luego ejecuten:
+<pre>docker compose up -d --force-recreate lb</pre>
+(Se recrea el contenedor para asegurar que lea el archivo editado.)</li>
+</ol>
+<div class="ver"><b>Deben ver:</b> la réplica lenta recibe <b>muchas menos</b> peticiones. El balanceador la evita sin que nadie se lo diga.</div>
+<p>Al terminar:</p>
+<pre>docker compose down</pre>
+
+<h2 class="pb">Parte C · Orquestador y clúster con Kubernetes (35 min)</h2>
+
+<h3>C1. Crear un clúster de 3 nodos en su laptop</h3>
+<pre>kind create cluster --config k8s/kind-cluster.yaml
+kubectl get nodes
+docker ps</pre>
+<div class="ver"><b>Deben ver:</b> 3 nodos: <code>ais86-control-plane</code>, <code>ais86-worker</code> y <code>ais86-worker2</code>. En <code>docker ps</code>, cada nodo es un contenedor que simula una máquina.</div>
+<div class="ojo">La primera vez descarga una imagen grande y tarda unos minutos. Háganlo apenas lleguen.</div>
+
+<h3>C2. Declarar el estado deseado</h3>
+<pre>kind load docker-image lab-fallas:1.0 --name ais86
+kubectl apply -f k8s/app.yaml
+kubectl get pods -o wide</pre>
+<p>Levanten solo el monitor (la API ahora la sirve Kubernetes):</p>
+<pre>docker compose --profile monitor up -d monitor</pre>
+<p>Abran <code>http://localhost:8090</code>. Verifiquen que la caja de URL diga <code>http://localhost:30080/</code> y presionen ▶ Iniciar.</p>
+<div class="ojo">No abran <code>index.html</code> con doble clic: el navegador puede bloquear las peticiones desde un archivo local hacia <code>localhost</code>.</div>
+<div class="ver"><b>Deben ver:</b> 3 colores, pero <b>en orden aleatorio</b>, no alternados como con nginx: el <code>Service</code> de Kubernetes elige un pod al azar por cada conexión. La columna <code>NODE</code> de <code>kubectl get pods -o wide</code> dice en qué máquina quedó cada pod.</div>
+<div class="por"><b>Lean <code>k8s/app.yaml</code>:</b>
+<ul>
+<li><code>replicas: 3</code> es el <b>estado deseado</b>;</li>
+<li><code>readinessProbe</code> y <code>livenessProbe</code> son los <b>health checks</b>;</li>
+<li>el <code>Service</code> encuentra los pods por la etiqueta <code>app: api</code>, <b>no por IP</b>. Eso es el descubrimiento de servicios.</li>
+</ul></div>
+
+<h3>C3. Borrar un pod</h3>
+<p>Abran una segunda terminal con <code>kubectl get pods -w</code>. En la primera:</p>
+<pre>kubectl get pods
+kubectl delete pod &lt;nombre-de-un-pod&gt;</pre>
+<div class="ver"><b>Deben ver:</b> el orquestador crea otro pod <b>al instante</b>, con otro nombre y otra IP. El monitor apenas lo nota: como mucho, algún rojo aislado mientras el pod se apaga.</div>
+<div class="por"><b>Comparen con la Parte B:</b> ahí nadie levantaba la réplica muerta.</div>
+
+<h3>C4. Que se caiga el proceso</h3>
+<p>En el monitor, presionen <b>💥 Tumbar una réplica</b>. Luego:</p>
+<pre>kubectl get pods</pre>
+<div class="ver"><b>Deben ver:</b> en un pod, la columna <code>RESTARTS</code> sube a 1: Kubernetes reinició el contenedor solo. Es probable que aparezcan <b>algunos rojos durante unos segundos</b>.</div>
+<div class="por"><b>Por qué hay rojos aquí y no en B2(a):</b> el <code>Service</code> de Kubernetes es un balanceador de <b>capa 4</b> y <b>no reintenta</b> una petición fallida; nginx (capa 7, con <code>proxy_next_upstream</code>) sí lo hacía. Kubernetes saca al pod caído del reparto apenas detecta la caída, pero las peticiones que ya iban hacia él fallan. Por eso en producción se pone un balanceador de capa 7 (Ingress / Gateway) delante.</div>
+
+<h3>C5. Escalar</h3>
+<pre>kubectl scale deployment api --replicas=5
+kubectl get pods -o wide</pre>
+<div class="ver"><b>Deben ver:</b> aparecen 2 colores nuevos en el monitor, sin tocar ninguna configuración del balanceador.</div>
+
+<h3>C6. Que se caiga una máquina entera</h3>
+<pre>docker stop ais86-worker
+kubectl get nodes        # repitan cada 15 s
+kubectl get pods -o wide # repitan cada 15 s</pre>
+<div class="ver"><b>Deben ver:</b>
+<ul>
+<li>mientras el plano de control <b>todavía no se da cuenta</b>, el monitor muestra <b>rojos</b>: el <code>Service</code> sigue enviando tráfico a los pods del nodo apagado;</li>
+<li>en 1–2 minutos el nodo pasa a <code>NotReady</code> y los rojos desaparecen;</li>
+<li>unos 15 s después sus pods se <b>recrean en el otro worker</b>. Los pods viejos quedan como <code>Terminating</code>: Kubernetes no puede confirmar su borrado porque la máquina no contesta. Es normal.</li>
+</ul>
+Eso es un <b>clúster</b>: perder una máquina no tumba el servicio, pero <b>detectarlo toma tiempo</b>, y ese tiempo es una decisión de diseño.</div>
+<pre>docker start ais86-worker
+kubectl get nodes        # en 1–2 min debería volver a Ready</pre>
+<div class="ojo">Si el nodo no vuelve a <code>Ready</code> en 2 minutos, no importa: sigan con C7. Al final se borra todo el clúster.</div>
+
+<h3>C7. Desplegar una versión rota</h3>
+<p>Primero vuelvan a 3 réplicas (así el resultado es más claro). Luego simulen que publican una versión cuyo chequeo de salud falla:</p>
+<pre>kubectl scale deployment api --replicas=3
+kubectl set env deployment/api ROMPER_HEALTH=1
+kubectl get pods                         # repitan cada 10 s
+kubectl rollout status deployment/api   # se queda esperando: Ctrl+C</pre>
+<div class="ver"><b>Deben ver:</b>
+<ul>
+<li>un pod nuevo que <b>nunca llega a 1/1 READY</b>, y su <code>RESTARTS</code> sube (también falla el <i>liveness</i>);</li>
+<li>los 3 pods viejos <b>siguen atendiendo</b>, y el monitor sigue sin rojos.</li>
+</ul>
+Kubernetes no reemplaza lo que funciona por algo que no pasa su health check. Con 3 réplicas, la estrategia por defecto (<code>maxSurge</code> 25 %, <code>maxUnavailable</code> 25 %) permite crear 1 pod extra y no retirar ninguno viejo hasta que el nuevo esté listo.</div>
+<p>Vuelvan atrás:</p>
+<pre>kubectl rollout undo deployment/api</pre>
+
+<h3>C8. Limpiar (importante: libera memoria)</h3>
+<pre>kind delete cluster --name ais86
+docker compose --profile monitor down</pre>
+
+<div class="ojo"><b>Detalle para los curiosos:</b>
+<ul>
+<li>el <code>Service</code> de Kubernetes reparte <b>por conexión</b> (capa 4), mientras que nginx reparte <b>por petición</b> (capa 7);</li>
+<li>el servicio del lab cierra la conexión en cada respuesta para que vean el reparto;</li>
+<li>¿qué pasaría si no lo hiciera?</li>
+</ul></div>
+
+<h2>Entrega: <code>docs/fallas-s12.md</code> en el repo del equipo</h2>
+
+<p>Una fila por experimento, con su captura del monitor o de la terminal:</p>
+<table>
+<tr><th>Exp.</th><th>Qué rompimos</th><th>Qué vimos (evidencia)</th><th>Qué pieza lo resolvió y cómo</th><th>Integrante</th></tr>
+<tr><td>A2–A3</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>B2</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>B3</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>B4</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>C3–C4</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>C6</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>C7</td><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<p><b>Reglas:</b></p>
+<ul>
+<li>Cada integrante escribe <b>sus</b> filas y las sube en <b>su propio Pull Request</b>.</li>
+<li>Otro integrante revisa ese PR antes de fusionarlo.</li>
+<li>En la revisión, el docente pedirá a cualquiera que repita en vivo un experimento que no hizo.</li>
+</ul>
+
+<p><b>Pregunta final</b> (un párrafo por equipo): en su sistema, ¿cuál de las fallas de hoy les dolería más y qué pieza de las 4 la previene?</p>
+
+<div class="box"><b>Miércoles:</b> la misma imagen, en AWS.
+<ul>
+<li>Se sube al registro de AWS (ECR).</li>
+<li>Se ejecutan 2 copias en ECS detrás de un balanceador administrado (ALB).</li>
+<li>Repetiremos C3 y C4 en la nube.</li>
+</ul>
+Traigan Docker funcionando y la cuenta de AWS del equipo, según lo que indique el docente.</div>
+
+
+<h2 class="pb">Anexo · Ficha de consulta: balanceo de carga</h2>
+
+<h3>1. Por qué existe</h3>
+<ul>
+<li><b>Escalado vertical (scale up):</b> más CPU/RAM a un solo servidor. Tiene límite físico y sigue siendo un <b>punto único de falla (SPOF)</b>.</li>
+<li><b>Escalado horizontal (scale out):</b> más copias en paralelo. Exige servicios sin estado y un <b>balanceador</b> que reparta.</li>
+</ul>
+
+<h3>2. Tipos de balanceador</h3>
+<table>
+<tr><th>Criterio</th><th>Tipo</th><th>Qué es</th><th>Ejemplos</th></tr>
+<tr><td rowspan="3">Implementación</td><td>Software</td><td>Programa en servidores comunes, VMs o contenedores. Barato y flexible; tú lo operas.</td><td>NGINX, HAProxy, Envoy, Traefik</td></tr>
+<tr><td>Hardware</td><td>Equipo dedicado con chips especializados (p. ej. cifrado TLS) para tráfico masivo en centros de datos propios.</td><td>F5 BIG-IP, NetScaler (antes Citrix ADC)</td></tr>
+<tr><td>Nube (gestionado)</td><td>Lo opera el proveedor; escala solo y trae health checks. En AWS incluye protección DDoS básica (Shield Standard).</td><td>AWS ELB (ALB, NLB, GWLB), Azure Load Balancer (capa 4) / Application Gateway (capa 7), Google Cloud Load Balancing</td></tr>
+<tr><td rowspan="2">Capa OSI</td><td>Capa 4 (transporte)</td><td>Decide por IP, puerto y protocolo (TCP/UDP), una vez por conexión. Muy baja latencia; sirve para cualquier protocolo. No ve URL ni cookies.</td><td>AWS NLB, HAProxy en modo TCP, Service de Kubernetes</td></tr>
+<tr><td>Capa 7 (aplicación)</td><td>Lee HTTP (método, URL, cabeceras, cookies) y decide en cada petición: <code>/api/pagos</code> a un servicio, <code>/api/usuarios</code> a otro. Puede reintentar y terminar TLS.</td><td>nginx, AWS ALB, Envoy, Traefik, Ingress / Gateway API</td></tr>
+<tr><td rowspan="2">Alcance</td><td>Local</td><td>Entre servidores de un mismo centro de datos o región.</td><td>nginx, ALB en una región</td></tr>
+<tr><td>Global (GSLB)</td><td>Envía a cada usuario a la región más cercana o sana, con DNS inteligente o Anycast.</td><td>Route 53, AWS Global Accelerator, Cloudflare</td></tr>
+</table>
+
+<h3>3. Algoritmos</h3>
+<table>
+<tr><th>Algoritmo</th><th>Cómo decide</th><th>Úsalo cuando…</th><th>Dónde</th></tr>
+<tr><td>Round robin</td><td>En orden: A → B → C → A</td><td>Servidores iguales, peticiones parecidas</td><td>nginx y AWS ALB (por defecto)</td></tr>
+<tr><td>Round robin ponderado</td><td>En orden, según un peso</td><td>Servidores de distinta capacidad</td><td>nginx <code>weight=</code>, HAProxy</td></tr>
+<tr><td>Menos conexiones</td><td>Al que tiene menos peticiones en curso</td><td>Duración variable: pagos, descargas, WebSockets</td><td>nginx <code>least_conn</code>, HAProxy <code>leastconn</code>, ALB «least outstanding requests»</td></tr>
+<tr><td>Menos conexiones ponderado</td><td>Conexiones ÷ peso</td><td>Servidores distintos y duración impredecible</td><td>nginx y HAProxy (respetan el peso)</td></tr>
+<tr><td>Menor tiempo de respuesta</td><td>Al más rápido (y menos cargado)</td><td>La latencia es crítica</td><td>NGINX Plus <code>least_time</code> (comercial), F5</td></tr>
+<tr><td>Aleatorio / «dos al azar»</td><td>Al azar, o elige 2 al azar y manda al menos cargado</td><td>Muchos balanceadores sin estado compartido</td><td>Envoy, nginx <code>random two</code>, Service de Kubernetes (azar por conexión)</td></tr>
+<tr><td>Hash de IP</td><td>Misma IP de cliente → mismo servidor</td><td>Afinidad de sesión sin almacenamiento compartido. <b>Ojo:</b> detrás de NAT (un aula entera sale con 1 IP) todos caen en el mismo servidor</td><td>nginx <code>ip_hash</code>; AWS NLB usa hash de flujo</td></tr>
+<tr><td>Hash consistente</td><td>Anillo de hash: si entra o sale un nodo, solo se reasigna una fracción pequeña</td><td>Cachés y sistemas que crecen o se achican</td><td>nginx <code>hash … consistent</code>, Envoy</td></tr>
+<tr><td>Geográfico</td><td>Según la ubicación derivada de la IP</td><td>Servicios en varias regiones</td><td>Route 53, CDNs</td></tr>
+</table>
+
+<h3>4. Términos relacionados</h3>
+<table>
+<tr><th>Término</th><th>Definición breve</th></tr>
+<tr><td>Proxy directo (forward)</td><td>Actúa en nombre de los clientes y los oculta ante internet (p. ej. el proxy de una red corporativa).</td></tr>
+<tr><td>Proxy inverso (reverse)</td><td>Se ubica delante de los servidores y oculta sus IPs; gestiona TLS, caché y balanceo. Todo balanceador de capa 7 es un proxy inverso. Algunos de capa 4 solo reenvían paquetes sin abrir la conexión (p. ej. IPVS en modo <i>direct server return</i>).</td></tr>
+<tr><td>API Gateway</td><td>Proxy inverso de capa 7 que además centraliza autenticación, límite de peticiones (<i>rate limiting</i>), caché, transformación de cabeceras y métricas por API. El balanceador reparte entre copias de un servicio; el gateway decide a qué servicio va cada petición.</td></tr>
+<tr><td>Health check activo</td><td>El balanceador consulta una ruta (p. ej. <code>/health</code>) cada N segundos. Tras X fallos seguidos marca al servidor como <i>unhealthy</i> y deja de enviarle tráfico; tras Y respuestas correctas lo reincorpora.</td></tr>
+<tr><td>Health check pasivo</td><td>Detecta fallas en el tráfico real (nginx <code>max_fails</code>). Algún usuario ya recibió el error.</td></tr>
+<tr><td>Drenaje de conexiones</td><td>Al retirar un servidor, deja terminar las peticiones en curso antes de apagarlo (en AWS: <i>deregistration delay</i>).</td></tr>
+<tr><td>Sesiones pegajosas (sticky)</td><td>Cookie o hash de IP que envía al usuario siempre al mismo servidor. Reparte peor y, si ese servidor cae, se pierde la sesión. Se evitan con sesiones sin estado (JWT) o estado compartido (Redis).</td></tr>
+<tr><td>Terminación TLS</td><td>El balanceador descifra HTTPS (el certificado vive en él) y así puede leer la petición. La alternativa en capa 4 es <i>TLS passthrough</i>.</td></tr>
+<tr><td>SPOF</td><td>Componente único cuya caída detiene todo. Un balanceador sin redundancia también lo es.</td></tr>
+<tr><td>VIP y activo-pasivo</td><td>Dos balanceadores comparten una IP virtual. El activo atiende y el pasivo vigila con latidos; si el activo cae, el pasivo toma la VIP en segundos (VRRP, p. ej. keepalived).</td></tr>
+<tr><td>Activo-activo</td><td>Varios balanceadores atienden a la vez; el tráfico se reparte entre ellos con DNS, ECMP o Anycast. Los balanceadores gestionados de la nube funcionan así y reemplazan sus nodos fallidos automáticamente.</td></tr>
+<tr><td>Alta disponibilidad vs. tolerancia a fallos</td><td>Alta disponibilidad: poco tiempo fuera de servicio (99,9 % ≈ 8,8 h al año). Tolerancia a fallos: seguir funcionando sin interrupción visible aunque un componente falle.</td></tr>
+<tr><td>Latencia</td><td>Cada salto agrega tiempo de ida y vuelta: un balanceador de capa 4 agrega menos que uno de capa 7.</td></tr>
+</table>
+
+<h3>5. En AWS (miércoles) y en Kubernetes</h3>
+<ul>
+<li><b>ALB</b> (capa 7): web y APIs, reglas por ruta y dominio; algoritmos round robin (por defecto), <i>least outstanding requests</i> y <i>weighted random</i>.</li>
+<li><b>NLB</b> (capa 4): TCP/UDP/TLS, IP estática, latencia muy baja, hash de flujo.</li>
+<li><b>GWLB</b> (capa 3): para insertar firewalls o equipos de inspección.</li>
+<li><b>CLB</b>: generación anterior; no usar en proyectos nuevos.</li>
+<li><b>Kubernetes:</b> <code>Service</code> = capa 4. <code>Ingress</code> o <b>Gateway API</b> = capa 7. El controlador <code>ingress-nginx</code> se retiró en marzo de 2026 y lo recomendado ahora es Gateway API.</li>
+</ul>
+
+</body>
+</html>

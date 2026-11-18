@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Guía Lab S12 · Rompe la arquitectura en AWS · AIS86</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 15mm 14mm
+    }
+
+    @media print {
+      body {
+        padding: 0 !important;
+        max-width: 100% !important;
+        font-size: 9.8pt !important;
+        line-height: 1.38 !important;
+      }
+
+      h1 {
+        font-size: 19pt !important;
+        margin: 0 0 3px !important;
+      }
+
+      .sub {
+        margin-bottom: 6px !important;
+        font-size: 8.8pt !important;
+      }
+
+      h2 {
+        font-size: 13pt !important;
+        margin: 11px 0 4px !important;
+        padding-bottom: 2px !important;
+      }
+
+      h3 {
+        font-size: 10.5pt !important;
+        margin: 9px 0 3px !important;
+      }
+
+      .box {
+        margin: 5px 0 !important;
+        padding: 5px 9px !important;
+      }
+
+      .ojo,
+      .ver,
+      .por,
+      .pc,
+      .pred {
+        margin: 4px 0 !important;
+        padding: 4px 8px !important;
+        break-inside: avoid;
+      }
+
+      pre {
+        margin: 3px 0 !important;
+        padding: 4px 7px !important;
+        font-size: 8.5pt !important;
+        break-inside: avoid;
+      }
+
+      table {
+        margin: 4px 0 !important;
+        font-size: 8.8pt !important;
+        break-inside: avoid;
+      }
+
+      th,
+      td {
+        padding: 2.5px 5px !important;
+      }
+
+      ol li,
+      ul li {
+        margin: 1px 0 !important;
+      }
+    }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #1b1e2b;
+      margin: 0 auto;
+      max-width: 820px;
+      padding: 16px;
+      background: #fff
+    }
+
+    h1 {
+      font-size: 22pt;
+      margin: 0 0 4px;
+      color: #1d3b8f
+    }
+
+    h2 {
+      font-size: 15pt;
+      margin: 22px 0 6px;
+      color: #1d3b8f;
+      border-bottom: 2px solid #1d3b8f;
+      padding-bottom: 3px;
+      break-after: avoid
+    }
+
+    h3 {
+      font-size: 12pt;
+      margin: 14px 0 4px;
+      break-after: avoid
+    }
+
+    .sub {
+      color: #555;
+      margin-bottom: 10px
+    }
+
+    pre {
+      background: #f1f3f8;
+      border: 1px solid #d6dbe8;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-family: Consolas, monospace;
+      font-size: 9.5pt;
+      white-space: pre-wrap;
+      break-inside: avoid;
+      margin: 6px 0
+    }
+
+    code {
+      font-family: Consolas, monospace;
+      font-size: 9.5pt;
+      background: #f1f3f8;
+      padding: 0 3px;
+      border-radius: 3px
+    }
+
+    .ver {
+      border-left: 4px solid #139a5e;
+      background: #eefaf3;
+      padding: 6px 10px;
+      margin: 6px 0;
+      break-inside: avoid
+    }
+
+    .por {
+      border-left: 4px solid #1d3b8f;
+      background: #eef2fc;
+      padding: 6px 10px;
+      margin: 6px 0;
+      break-inside: avoid
+    }
+
+    .ojo {
+      border-left: 4px solid #d08b00;
+      background: #fff7e6;
+      padding: 6px 10px;
+      margin: 6px 0;
+      break-inside: avoid
+    }
+
+    .pc {
+      border: 2px solid #139a5e;
+      border-radius: 8px;
+      padding: 6px 12px;
+      margin: 10px 0;
+      background: #f4fbf7;
+      break-inside: avoid
+    }
+
+    .pc b:first-child {
+      color: #0d7a49
+    }
+
+    .pred {
+      border: 2px dashed #7a5cc2;
+      border-radius: 8px;
+      padding: 6px 12px;
+      margin: 8px 0;
+      background: #f7f4fd;
+      break-inside: avoid
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 6px 0;
+      font-size: 10pt;
+      break-inside: avoid
+    }
+
+    th,
+    td {
+      border: 1px solid #c9cfdd;
+      padding: 5px 7px;
+      text-align: left;
+      vertical-align: top
+    }
+
+    th {
+      background: #e7ebf5
+    }
+
+    .box {
+      border: 1px solid #c9cfdd;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin: 8px 0
+    }
+
+    .pb {
+      break-before: page
+    }
+
+    ol li,
+    ul li {
+      margin: 2px 0
+    }
+
+    .small {
+      font-size: 9pt;
+      color: #555
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Laboratorio S12 (miércoles) · Rompe la arquitectura en AWS</h1>
+  <div class="sub">AIS86 Arquitectura de Software · UNAMBA · Contenedor + réplicas + balanceador + orquestador, ahora en
+    la nube · 100 min, en equipo</div>
+
+  <div class="box">
+    <b>La idea de hoy.</b> Es la <b>misma imagen</b> del lunes (<code>lab-fallas:1.0</code>) y son los <b>mismos
+      experimentos</b>, pero en AWS. El lunes las piezas eran nginx, <code>docker compose</code> y kind. Hoy las
+    reemplaza un servicio administrado:
+    <ul>
+      <li>el balanceador es un <b>ALB</b>;</li>
+      <li>el orquestador es <b>ECS</b>;</li>
+      <li>las máquinas las pone <b>Fargate</b>, y no ven ningún servidor.</li>
+    </ul>
+    Lo que se califica: los 3 <b>puntos de control</b> demostrados y explicados en el aula.
+  </div>
+
+  <h2>Del lunes a hoy: la misma pieza, otro nombre</h2>
+  <table>
+    <tr>
+      <th>El lunes (en su laptop)</th>
+      <th>Hoy (en AWS)</th>
+      <th>Qué hace</th>
+    </tr>
+    <tr>
+      <td><code>docker build</code> + imagen local</td>
+      <td><b>ECR</b> (Elastic Container Registry)</td>
+      <td>Guarda la imagen para que la nube pueda descargarla</td>
+    </tr>
+    <tr>
+      <td>La sección <code>api</code> de <code>compose.yaml</code></td>
+      <td><b>Definición de tarea</b> (<i>task definition</i>)</td>
+      <td>Qué imagen, cuánta CPU y RAM, qué puerto, qué variables</td>
+    </tr>
+    <tr>
+      <td><code>replicas: 3</code> / el <i>Deployment</i> de Kubernetes</td>
+      <td><b>Servicio de ECS</b> con <i>desired tasks</i></td>
+      <td>Mantiene el estado deseado: «quiero 2 copias»</td>
+    </tr>
+    <tr>
+      <td>nginx (<code>upstream</code>)</td>
+      <td><b>ALB</b> + <b>grupo de destino</b> (<i>target group</i>)</td>
+      <td>Reparte las peticiones y hace los <i>health checks</i></td>
+    </tr>
+    <tr>
+      <td>Los nodos de kind</td>
+      <td><b>Fargate</b></td>
+      <td>Pone la CPU y la RAM; ustedes no administran máquinas</td>
+    </tr>
+    <tr>
+      <td><code>kubectl rollout undo</code></td>
+      <td><b>Circuit breaker</b> de despliegue con <i>rollback</i></td>
+      <td>Si la versión nueva no está sana, vuelve sola a la anterior</td>
+    </tr>
+  </table>
+
+  <h2>0. Antes de clase (en casa: la verificación de la cuenta puede tardar)</h2>
+  <ol>
+    <li><b>Una cuenta de AWS por equipo.</b>
+      <ul>
+        <li>Un integrante entra a <code>aws.amazon.com</code>, elige crear una cuenta y se registra con su cuenta de
+          Google o de GitHub. Es la nueva experiencia de AWS: la mayoría de las cuentas nuevas no necesita tarjeta y
+          recibe hasta US$ 200 en créditos.</li>
+        <li>Luego <b>invita a sus compañeros</b> por correo desde <b>AWS Settings</b>. No compartan contraseñas.</li>
+      </ul>
+    </li>
+    <li><b>Anoten la región de su cuenta.</b> A las cuentas con dirección de contacto en Perú, AWS les asigna <b>US East
+        (Ohio), <code>us-east-2</code></b>. Confírmenlo en AWS Settings → <i>View all projects</i> → <i>Overview</i> →
+      <i>Additional info</i> → <i>Region</i>. Todo se crea en esa región; en la consola, revisen que arriba a la derecha
+      diga esa misma región.
+    </li>
+    <li><b>Alarma de presupuesto, antes de crear nada.</b> En la consola, entren a <i>Billing and Cost Management</i> →
+      <i>Budgets</i> → <i>Create budget</i> → <i>Use a template</i> → <i>Monthly cost budget</i>, con un monto de <b>US$
+        10</b> y su correo.
+    </li>
+    <li><b>AWS CLI 2.32 o más reciente</b> en la laptop de quien subirá la imagen:
+      <pre>aws --version
+# si no está instalado o es más antiguo:
+winget install Amazon.AWSCLI</pre>
+    </li>
+    <li><b>La imagen del lunes construida.</b> <code>docker images lab-fallas</code> debe mostrar
+      <code>lab-fallas 1.0</code>. Si no aparece, desde la carpeta <code>lab-fallas</code>:
+      <pre>docker build -t lab-fallas:1.0 ./app</pre>
+      <div class="ojo">Las Mac con chip Apple (M1 a M4) construyen imágenes ARM por defecto, y Fargate usa x86 por
+        defecto. En una Mac construyan así: <code>docker build --platform linux/amd64 -t lab-fallas:1.0 ./app</code>
+      </div>
+    </li>
+  </ol>
+
+  <h2>Parte A · Subir la imagen a ECR (15 min)</h2>
+  <h3>A1. Iniciar sesión desde la terminal</h3>
+  <pre>aws login
+# abre el navegador: elijan su sesión de la consola
+aws sts get-caller-identity</pre>
+  <div class="ver"><b>Deben ver:</b> un JSON con <code>Account</code> (12 dígitos) y <code>Arn</code>. Anoten el número
+    de cuenta.</div>
+  <div class="por"><b>Por qué:</b> <code>aws login</code> entrega credenciales <b>temporales</b> que la CLI renueva sola
+    hasta por 12 horas. No hay claves guardadas en la laptop que alguien pueda robar.</div>
+
+  <h3>A2. Crear el repositorio y subir la imagen</h3>
+  <p>Definan dos variables. En PowerShell (si su región no es Ohio, cámbienla):</p>
+  <pre>$REGION = "us-east-2"
+$CUENTA = (aws sts get-caller-identity --query Account --output text)
+$REPO   = "$CUENTA.dkr.ecr.$REGION.amazonaws.com/lab-fallas"</pre>
+  <pre>aws ecr create-repository --repository-name lab-fallas --region $REGION
+aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin "$CUENTA.dkr.ecr.$REGION.amazonaws.com"
+docker tag lab-fallas:1.0 "${REPO}:1.0"
+docker push "${REPO}:1.0"</pre>
+  <p class="small">En bash:
+    <code>REGION=us-east-2; CUENTA=$(aws sts get-caller-identity --query Account --output text); REPO=$CUENTA.dkr.ecr.$REGION.amazonaws.com/lab-fallas</code>,
+    y luego los mismos comandos con <code>$REPO:1.0</code>.
+  </p>
+  <div class="ver"><b>Deben ver:</b> <code>Login Succeeded</code> y, al final del <code>push</code>, una línea con
+    <code>digest: sha256:…</code>. En la consola, ECR → <i>Repositories</i> → <code>lab-fallas</code> muestra la
+    etiqueta <code>1.0</code>. Copien el <b>URI de la imagen</b>: lo van a necesitar.
+  </div>
+  <div class="ojo"><b>Plan B, si <code>aws login</code> no funciona con su cuenta:</b> suban la imagen a Docker Hub, que
+    ya usaron el lunes, como repositorio <b>público</b>. ECS puede descargar de ahí sin credenciales.
+    <pre>docker tag lab-fallas:1.0 &lt;su-usuario&gt;/lab-fallas:1.0
+docker push &lt;su-usuario&gt;/lab-fallas:1.0
+# URI de la imagen para ECS: docker.io/&lt;su-usuario&gt;/lab-fallas:1.0</pre>
+  </div>
+
+  <h2 class="pb">Parte B · Desplegar: 2 copias detrás de un ALB (30 min)</h2>
+  <p>Todo se hace en la consola web: <code>console.aws.amazon.com/ecs/v2</code>.</p>
+
+  <h3>B1. Crear el clúster</h3>
+  <p><i>Clusters</i> → <i>Create cluster</i> → nombre <code>lab-fallas</code>. En <i>Infrastructure</i> dejen <b>AWS
+      Fargate (serverless)</b>, que es la opción por defecto → <i>Create</i>.</p>
+
+  <h3>B2. Crear la definición de tarea</h3>
+  <p><i>Task definitions</i> → <i>Create new task definition</i>:</p>
+  <table>
+    <tr>
+      <th>Campo</th>
+      <th>Valor</th>
+    </tr>
+    <tr>
+      <td>Task definition family</td>
+      <td><code>lab-fallas</code></td>
+    </tr>
+    <tr>
+      <td>Launch type</td>
+      <td>AWS Fargate</td>
+    </tr>
+    <tr>
+      <td>Operating system/Architecture</td>
+      <td>Linux/X86_64</td>
+    </tr>
+    <tr>
+      <td>CPU / Memory</td>
+      <td><b>.25 vCPU</b> / <b>.5 GB</b> (lo mínimo: más barato)</td>
+    </tr>
+    <tr>
+      <td>Task execution role</td>
+      <td><i>Create new role</i>. Es el permiso para descargar la imagen y escribir logs.</td>
+    </tr>
+    <tr>
+      <td>Container: Name / Image URI</td>
+      <td><code>api</code> / el URI de la Parte A</td>
+    </tr>
+    <tr>
+      <td>Port mappings</td>
+      <td>Container port <b>8000</b>, TCP, protocolo HTTP</td>
+    </tr>
+    <tr>
+      <td>Log collection</td>
+      <td>Déjenla activada: los logs van a CloudWatch</td>
+    </tr>
+  </table>
+
+  <h3>B3. Crear el servicio con su balanceador</h3>
+  <p>Entren al clúster <code>lab-fallas</code> → pestaña <i>Services</i> → <i>Create</i>:</p>
+  <table>
+    <tr>
+      <th>Sección</th>
+      <th>Qué poner</th>
+    </tr>
+    <tr>
+      <td>Task definition / Service name</td>
+      <td><code>lab-fallas</code> (última revisión) / <code>api</code></td>
+    </tr>
+    <tr>
+      <td>Compute</td>
+      <td>Launch type <b>FARGATE</b></td>
+    </tr>
+    <tr>
+      <td>Desired tasks</td>
+      <td><b>2</b></td>
+    </tr>
+    <tr>
+      <td>Deployment failure detection</td>
+      <td>Revisen que estén marcados <b>Use the Amazon ECS deployment circuit breaker</b> y <b>Rollback on failures</b>.
+        Así vienen por defecto.</td>
+    </tr>
+    <tr>
+      <td>Networking</td>
+      <td>VPC predeterminada, todas sus subredes.<br><b>Security group → Create a new security group</b>, nombre
+        <code>lab-fallas-sg</code>, con dos reglas de entrada:<br>• HTTP, puerto 80, origen <i>Anywhere</i><br>• Custom
+        TCP, puerto 8000, origen <i>Anywhere</i><br><b>Public IP: ON</b>
+      </td>
+    </tr>
+    <tr>
+      <td>Load balancing</td>
+      <td>Application Load Balancer → <b>Create a new load balancer</b>, nombre
+        <code>lab-fallas-alb</code>.<br>Container <code>api 8000:8000</code>; listener en el puerto <b>80</b>,
+        HTTP.<br>Target group nuevo <code>lab-fallas-tg</code>, HTTP.<br><b>Deregistration delay: 10</b>.<br><b>Health
+          check path: <code>/health</code></b>
+      </td>
+    </tr>
+  </table>
+  <p>Presionen <i>Create</i>. El ALB tarda unos minutos en quedar activo.</p>
+  <div class="por"><b>Por qué la IP pública:</b> sin NAT Gateway (que cobra por hora), una tarea de Fargate solo llega a
+    internet para descargar la imagen si está en una subred pública y tiene IP pública.<br>
+    <b>Por qué abrimos el 8000 a todo internet:</b> es un laboratorio y así lo simplificamos. En producción, el puerto
+    8000 solo acepta tráfico <b>del security group del ALB</b>, y las tareas van en subredes privadas.
+  </div>
+
+  <h3>B4. Health checks más rápidos (mientras esperan)</h3>
+  <p>Los valores por defecto del ALB son revisar cada 30 s y exigir 5 respuestas sanas seguidas: una tarea nueva
+    tardaría unos 2,5 min en recibir tráfico. Vamos a acortarlos.</p>
+  <p>En la consola de <b>EC2</b> → <i>Target Groups</i> → <code>lab-fallas-tg</code> → pestaña <i>Health checks</i> →
+    <i>Edit</i>:
+  </p>
+  <ul>
+    <li><i>Interval</i>: <b>10</b> s</li>
+    <li><i>Healthy threshold</i>: <b>2</b></li>
+    <li><i>Unhealthy threshold</i>: <b>2</b></li>
+    <li><i>Timeout</i>: <b>5</b> s</li>
+  </ul>
+  <p>Guardar.</p>
+
+  <h3>B5. Abrir el servicio y el monitor</h3>
+  <p>EC2 → <i>Load Balancers</i> → <code>lab-fallas-alb</code> → copien el <b>DNS name</b>.</p>
+  <pre>curl.exe http://&lt;DNS-del-ALB&gt;/
+# levantar solo el monitor del lunes, desde la carpeta lab-fallas:
+docker compose --profile monitor up -d monitor</pre>
+  <p>Abran <code>http://localhost:8090</code>, peguen <code>http://&lt;DNS-del-ALB&gt;/</code> en la caja de URL y
+    presionen ▶ Iniciar.</p>
+  <div class="ver"><b>Deben ver:</b> cuadritos de <b>2 colores</b> que se alternan. Es el ALB repartiendo con <i>round
+      robin</i>, su algoritmo por defecto. En <code>lab-fallas-tg</code> → <i>Targets</i>, las 2 IP aparecen como
+    <b>healthy</b>.
+  </div>
+  <div class="pc"><b>✅ PUNTO DE CONTROL 1.</b> Muestren: la URL del ALB respondiendo en el monitor con 2 colores, y los 2
+    <i>targets</i> en estado <i>healthy</i>. Uno de ustedes, elegido al azar, explica qué pieza de AWS reemplaza a cada
+    pieza del lunes.
+  </div>
+
+  <h2 class="pb">Parte C · Romperlo en la nube (35 min)</h2>
+
+  <h3>C1. Matar una réplica</h3>
+  <div class="pred"><b>Predigan antes de ejecutar.</b> El lunes, nginx con <code>proxy_next_upstream</code> no mostró
+    ningún rojo y el Service de Kubernetes sí mostró algunos. ¿Qué hará el ALB? ¿Habrá rojos? ¿Cuántos segundos? ¿Quién
+    levantará una copia nueva?</div>
+  <p>Con el monitor corriendo, presionen <b>💥 Tumbar una réplica</b>. Luego miren ECS → servicio <code>api</code> →
+    pestañas <i>Tasks</i> y <i>Events</i>.</p>
+  <div class="ver"><b>Deben ver:</b>
+    <ul>
+      <li>Un color desaparece. ECS detecta que la tarea se detuvo, la saca del grupo de destino y <b>lanza una tarea
+          nueva</b>: en uno o dos minutos aparece un color nuevo, con el contador en cero.</li>
+      <li>Es probable que aparezcan <b>algunos rojos</b> durante unos segundos. El ALB no reenvía a otra réplica una
+        petición que ya falló, como sí hacía nginx con <code>proxy_next_upstream</code>.</li>
+    </ul>
+  </div>
+  <div class="por"><b>Por qué:</b> el orquestador mantiene el estado deseado («2 tareas»). Nadie levanta nada a mano: es
+    lo mismo que hizo Kubernetes en la Parte C del lunes, pero administrado por AWS.</div>
+
+  <h3>C2. Una réplica lenta: cambiar el algoritmo del ALB</h3>
+  <p>En el monitor elijan <b>8 peticiones simultáneas</b> y presionen <b>🐢 Volver lenta una réplica</b>. Esperen unos
+    30 s y miren la latencia por réplica y cuántas peticiones recibe cada una.</p>
+  <div class="pred"><b>Predigan:</b> con <i>round robin</i>, ¿qué fracción de las peticiones recibe la réplica lenta? ¿Y
+    con <i>least outstanding requests</i>?</div>
+  <p>Cambien el algoritmo en EC2 → <i>Target Groups</i> → <code>lab-fallas-tg</code> → pestaña <i>Attributes</i> →
+    <i>Edit</i> → <i>Load balancing algorithm</i>: <b>Least outstanding requests</b> → <i>Save changes</i>. Limpien el
+    monitor y vuelvan a medir 30 s.
+  </p>
+  <div class="ver"><b>Deben ver:</b> antes, la réplica lenta recibía más o menos la mitad de las peticiones (unos 2000
+    ms cada una). Después recibe <b>muchas menos</b>, porque el ALB prefiere a la que tiene menos peticiones en curso.
+    Es el <code>least_conn</code> de nginx del lunes, ahora con un clic.</div>
+  <p class="small">El ALB tiene 3 algoritmos: <i>round robin</i> (por defecto), <i>least outstanding requests</i> y
+    <i>weighted random</i>. Hay uno activo a la vez por grupo de destino.
+  </p>
+  <div class="pc"><b>✅ PUNTO DE CONTROL 2.</b> Muestren: (1) la captura de la pestaña <i>Events</i> donde ECS lanza la
+    tarea de reemplazo; (2) las dos capturas del monitor, antes y después de cambiar el algoritmo, con el porcentaje de
+    peticiones de la réplica lenta.</div>
+
+  <h3>C3. Desplegar una versión rota</h3>
+  <div class="pred"><b>Predigan:</b> si publican una versión cuyo <code>/health</code> responde error, ¿se cae el
+    servicio? ¿Cuánto tarda AWS en darse cuenta? ¿Qué pasa al final?</div>
+  <ol>
+    <li>ECS → <i>Task definitions</i> → <code>lab-fallas</code> → seleccionen la última revisión → <i>Create new
+        revision</i> → en el contenedor <code>api</code>, <i>Environment variables</i> → <i>Add</i>:
+      <code>ROMPER_HEALTH</code> = <code>1</code> → <i>Create</i>.
+    </li>
+    <li>Clúster → servicio <code>api</code> → <i>Update service</i> → elijan la revisión nueva → <i>Update</i>.</li>
+    <li>Dejen el monitor corriendo. Miren las pestañas <i>Deployments</i> y <i>Events</i> del servicio y los
+      <i>Targets</i> del grupo de destino. Tarda <b>entre 5 y 10 minutos</b>: mientras tanto, observen la transición en la consola y el monitor.
+    </li>
+  </ol>
+  <div class="ver"><b>Deben ver:</b>
+    <ul>
+      <li>Las tareas nuevas arrancan, pero el ALB las marca <b>unhealthy</b> (<code>/health</code> responde 500) y ECS
+        las reemplaza.</li>
+      <li>Al llegar a <b>3 fallas</b>, el umbral mínimo del <i>circuit breaker</i>, el despliegue queda en <b>FAILED</b>
+        y ECS hace <b>rollback</b> a la revisión anterior. Lo verán en <i>Events</i> y <i>Deployments</i>.</li>
+      <li>Durante todo ese tiempo el monitor <b>no muestra rojos</b>: las 2 tareas viejas siguieron atendiendo, porque
+        ECS no retira las viejas hasta que las nuevas estén sanas.</li>
+    </ul>
+  </div>
+  <div class="por"><b>Por qué:</b> el <i>health check</i> es la puerta de entrada de cada versión nueva. Sin él, AWS
+    habría reemplazado una versión que funciona por una que no funciona. Es el C7 del lunes (<code>rollout undo</code>),
+    pero automático.</div>
+  <div class="pc"><b>✅ PUNTO DE CONTROL 3.</b> Muestren la captura del evento de <i>rollback</i> y el monitor sin rojos
+    durante el despliegue roto. Uno de ustedes explica por qué el usuario no se enteró.</div>
+
+  <h2>Parte D · Limpiar (10 min, obligatorio)</h2>
+  <div class="ojo"><b>El ALB y las tareas cobran por hora aunque nadie los use.</b> Si lo dejan encendido un mes,
+    consume unos US$ 50 de sus créditos.</div>
+  <ol>
+    <li>ECS → clúster → servicio <code>api</code> → <i>Delete service</i>. Marquen <i>Force delete</i> si lo pide.</li>
+    <li>EC2 → <i>Load Balancers</i> → <code>lab-fallas-alb</code> → <i>Actions</i> → <i>Delete</i>. Luego, EC2 →
+      <i>Target Groups</i> → <code>lab-fallas-tg</code> → <i>Delete</i>.
+    </li>
+    <li>ECS → <i>Clusters</i> → <code>lab-fallas</code> → <i>Delete cluster</i>.</li>
+    <li>Pueden dejar la imagen en ECR (guardarla cuesta centavos al mes) o borrarla en ECR → <code>lab-fallas</code> →
+      <i>Delete</i>.
+    </li>
+    <li>En su laptop: <code>docker compose --profile monitor down</code></li>
+    <li><b>Comprueben:</b> EC2 → <i>Load Balancers</i> debe estar vacío y ECS no debe tener tareas en ejecución.</li>
+  </ol>
+
+  <h3>¿Cuánto costó? (precios on-demand de us-east-2, Ohio: la región de las cuentas de Perú; noviembre de 2026)</h3>
+  <table>
+    <tr>
+      <th>Pieza</th>
+      <th>Precio</th>
+      <th>En este laboratorio (~2 h)</th>
+    </tr>
+    <tr>
+      <td>ALB</td>
+      <td>US$ 0.0225 por hora + US$ 0.008 por LCU-hora</td>
+      <td>≈ US$ 0.06</td>
+    </tr>
+    <tr>
+      <td>2 tareas Fargate de 0.25 vCPU y 0.5 GB</td>
+      <td>US$ 0.04048 por vCPU-hora + US$ 0.004445 por GB-hora → ≈ US$ 0.0123 por tarea-hora</td>
+      <td>≈ US$ 0.05</td>
+    </tr>
+    <tr>
+      <td>IPv4 públicas (las del ALB y las de las tareas)</td>
+      <td>US$ 0.005 por IP-hora</td>
+      <td>≈ US$ 0.04</td>
+    </tr>
+    <tr>
+      <td colspan="2"><b>Total aproximado</b></td>
+      <td><b>≈ US$ 0.15 de los créditos</b></td>
+    </tr>
+  </table>
+
+  <h2>Si algo falla</h2>
+  <table>
+    <tr>
+      <th>Síntoma</th>
+      <th>Causa probable</th>
+      <th>Qué hacer</th>
+    </tr>
+    <tr>
+      <td>Los <i>targets</i> quedan <i>unhealthy</i> con «Request timed out»</td>
+      <td>El security group no deja pasar el puerto 8000</td>
+      <td>EC2 → <i>Security Groups</i> → <code>lab-fallas-sg</code>: agreguen TCP 8000. Revisen también que el ALB use
+        ese grupo (EC2 → <i>Load Balancers</i> → pestaña <i>Security</i>).</td>
+    </tr>
+    <tr>
+      <td><i>Unhealthy</i> con «Health checks failed with these codes: [404]»</td>
+      <td>El <i>health check path</i> quedó en <code>/</code> o mal escrito</td>
+      <td><i>Target group</i> → <i>Health checks</i> → <i>Edit</i> → path <code>/health</code></td>
+    </tr>
+    <tr>
+      <td>La tarea se detiene con <code>CannotPullContainerError</code></td>
+      <td>Sin IP pública, URI equivocado o imagen ARM</td>
+      <td>Public IP: ON; copien el URI desde ECR; en Mac, usen <code>--platform linux/amd64</code></td>
+    </tr>
+    <tr>
+      <td>La tarea se detiene con <code>exec format error</code></td>
+      <td>Imagen construida para ARM</td>
+      <td>Reconstruyan con <code>--platform linux/amd64</code> y vuelvan a hacer <code>push</code></td>
+    </tr>
+    <tr>
+      <td>En <i>Networking</i> no aparece ninguna VPC</td>
+      <td>La cuenta no tiene VPC predeterminada</td>
+      <td>Consola de VPC → <i>Your VPCs</i> → <i>Actions</i> → <i>Create default VPC</i></td>
+    </tr>
+    <tr>
+      <td>El monitor no muestra nada</td>
+      <td>La URL de la caja está mal</td>
+      <td>Debe ser <code>http://&lt;DNS&gt;/</code>, con <code>http</code> (no <code>https</code>) y con la barra final
+      </td>
+    </tr>
+  </table>
+
+  <h2>Fuentes</h2>
+  <ul class="small">
+    <li>Crear un servicio de ECS en la consola (circuit breaker y rollback por defecto, ALB nuevo, <i>deregistration
+        delay</i> de 300 s por defecto, <i>health check path</i>):
+      docs.aws.amazon.com/AmazonECS/latest/developerguide/create-service-console-v2.html</li>
+    <li>Cómo detecta fallas el <i>circuit breaker</i> (umbral = 50 % de las tareas deseadas, mínimo 3 y máximo 200):
+      docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-circuit-breaker.html</li>
+    <li>Algoritmos del ALB (<i>round robin</i>, <i>least outstanding requests</i>, <i>weighted random</i>):
+      docs.aws.amazon.com/elasticloadbalancing/latest/application/edit-target-group-attributes.html</li>
+    <li><i>Health checks</i> del ALB (intervalo de 30 s; umbral sano 5 y no sano 2 por defecto):
+      docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html</li>
+    <li><code>aws login</code> (CLI 2.32.0 o más reciente, credenciales temporales de hasta 12 h):
+      docs.aws.amazon.com/cli/latest/userguide/cli-configure-sign-in.html</li>
+    <li>Servicios del nivel gratuito de la nueva experiencia (ECS, ECR y Elastic Load Balancing incluidos):
+      docs.aws.amazon.com/accounts/latest/reference/supported-services-sign-up-new.html</li>
+    <li>Nueva experiencia de AWS (registro con Google o GitHub, sin tarjeta para la mayoría, hasta US$ 200):
+      aws.amazon.com/about-aws/whats-new/2026/09/New-AWS-Builder-Experience</li>
+    <li>Precios: AWS Price List API, ofertas AmazonECS, AWSELB y AmazonVPC de us-east-2 (consultadas el 16 nov 2026).
+      Región asignada a cuentas de Perú: docs.aws.amazon.com/accounts/latest/reference/project-regions.html</li>
+  </ul>
+
+</body>
+
+</html>
