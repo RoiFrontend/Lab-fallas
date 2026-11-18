@@ -61,9 +61,9 @@
 (function(){
   var COLORS=['#4c7dff','#ffb020','#2ec4b6','#c86bfa','#f25f9a','#8bd450','#ff8a3d','#38bdf8'];
   var T=document.getElementById('target');
-  // Parte B: el monitor lo sirve nginx en :8080 junto a la API (/api/).
+  // Parte B: el monitor lo sirve nginx junto a la API (/api/).
   // Parte C: se sirve solo en :8090 y apunta al Service de Kubernetes (:30080).
-  var def = location.port === '8080' ? location.origin + '/api/' : 'http://localhost:30080/';
+  var def = location.port === '8090' ? 'http://localhost:30080/' : location.origin + '/api/';
   try{ T.value = localStorage.getItem('lab-target') || def; }catch(e){ T.value=def; }
   T.addEventListener('change',function(){try{localStorage.setItem('lab-target',T.value);}catch(e){}});
   var tiles=document.getElementById('tiles'), N=400;

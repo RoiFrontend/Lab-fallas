@@ -1,6 +1,6 @@
 # Lab S12: 3 réplicas detrás de nginx + Redis opcional.
 #   docker compose up -d --build
-#   Monitor visual: http://localhost:8080
+#   Monitor visual: http://localhost:8085
 name: lab-fallas
 
 services:
@@ -17,7 +17,7 @@ services:
 
   lb:
     image: nginx:1.30-alpine
-    ports: ["8080:80"]
+    ports: ["${LB_PORT:-8085}:80"]
     volumes:
       - ./nginx/${NGINX_CONF:-nginx.conf}:/etc/nginx/nginx.conf:ro   # B2: NGINX_CONF=nginx-defectuoso.conf
       - ./monitor:/usr/share/nginx/html:ro
