@@ -62,9 +62,17 @@
   var COLORS=['#4c7dff','#ffb020','#2ec4b6','#c86bfa','#f25f9a','#8bd450','#ff8a3d','#38bdf8'];
   var T=document.getElementById('target');
   // Parte B: el monitor lo sirve nginx junto a la API (/api/).
-  // Parte C: se sirve solo en :8090 y apunta al Service de Kubernetes (:30080).
-  var def = location.port === '8090' ? 'http://localhost:30080/' : location.origin + '/api/';
-  try{ T.value = localStorage.getItem('lab-target') || def; }catch(e){ T.value=def; }
+  // Parte C / AWS: se sirve en :8090 y apunta al ALB de AWS o al Service de Kubernetes.
+  var alb = 'http://lab-fallas-alb-154417865.us-east-2.elb.amazonaws.com/';
+  var def = location.port === '8090' ? alb : location.origin + '/api/';
+  try{
+    var saved = localStorage.getItem('lab-target');
+    if (location.port === '8090' && (!saved || saved.indexOf('30080') !== -1)) {
+      saved = alb;
+      localStorage.setItem('lab-target', alb);
+    }
+    T.value = saved || def;
+  }catch(e){ T.value=def; }
   T.addEventListener('change',function(){try{localStorage.setItem('lab-target',T.value);}catch(e){}});
   var tiles=document.getElementById('tiles'), N=400;
   for(var i=0;i<N;i++){var d=document.createElement('div');d.className='tile';tiles.appendChild(d);}
