@@ -35,7 +35,7 @@
   <h1>Monitor de réplicas</h1>
   <div class="dim">Cada cuadrito es una petición. El color dice qué réplica respondió. Rojo = error.</div>
   <div class="bar">
-    <input id="target" aria-label="URL del servicio">
+    <input id="target" value="http://lab-fallas-alb-154417865.us-east-2.elb.amazonaws.com/" aria-label="URL del servicio">
     <label class="dim">Peticiones simultáneas
       <select id="conc"><option>1</option><option selected>4</option><option>8</option></select></label>
     <button class="go" id="play">▶ Iniciar</button>
@@ -64,15 +64,13 @@
   // Parte B: el monitor lo sirve nginx junto a la API (/api/).
   // Parte C / AWS: se sirve en :8090 y apunta al ALB de AWS o al Service de Kubernetes.
   var alb = 'http://lab-fallas-alb-154417865.us-east-2.elb.amazonaws.com/';
-  var def = location.port === '8090' ? alb : location.origin + '/api/';
-  try{
-    var saved = localStorage.getItem('lab-target');
-    if (location.port === '8090' && (!saved || saved.indexOf('30080') !== -1)) {
-      saved = alb;
-      localStorage.setItem('lab-target', alb);
-    }
-    T.value = saved || def;
-  }catch(e){ T.value=def; }
+  if (location.port === '8090') {
+    T.value = alb;
+    try { localStorage.removeItem('lab-target'); } catch(e){}
+  } else {
+    var def = location.origin + '/api/';
+    try { T.value = localStorage.getItem('lab-target') || def; } catch(e){ T.value=def; }
+  }
   T.addEventListener('change',function(){try{localStorage.setItem('lab-target',T.value);}catch(e){}});
   var tiles=document.getElementById('tiles'), N=400;
   for(var i=0;i<N;i++){var d=document.createElement('div');d.className='tile';tiles.appendChild(d);}
