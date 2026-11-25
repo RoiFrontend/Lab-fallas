@@ -11,7 +11,14 @@ def to_base64(path):
 img_alg = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/graficos/comparativa_algoritmos.png")
 img_little = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/graficos/ley_de_little_escalabilidad.png")
 img_hc = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/aws_target_group_health_check.png")
-img_mon = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_errores_red.jpg")
+img_mon = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_errores_red.png")
+
+img_b1 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B1_round_robin.png")
+img_b2a = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B2a_failover_exitoso.png")
+img_b2b = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B2b_nginx_defectuoso_rojos.png")
+img_b3 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B3_redis_compartido.png")
+img_b4a = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B4a_lenta_round_robin.png")
+img_b4b = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B4b_lenta_least_conn.png")
 
 html_content = f"""<!DOCTYPE html>
 <html lang="es">
@@ -268,8 +275,38 @@ Con Docker Compose se desplegaron 3 réplicas de la API, un balanceador NGINX y 
 </p>
 
 <div class="img-box">
+  <img src="{img_b1}" alt="Monitor B1 Round Robin">
+  <div class="img-cap">Figura 1: Monitor visual en Experimento B1: Round Robin con 3 réplicas alternándose equitativamente (0 errores).</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_b2a}" alt="Monitor B2a Failover Exitoso">
+  <div class="img-cap">Figura 2: Monitor visual en Experimento B2(a): Failover exitoso con NGINX bueno tras 'docker kill lab-fallas-api-2' (0 errores).</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_b2b}" alt="Monitor B2b NGINX Defectuoso">
+  <div class="img-cap">Figura 3: Monitor visual en Experimento B2(b): Configuración defectuosa sin reintentos; se observan 34 cuadros rojos (33.7% error 504).</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_b3}" alt="Monitor B3 Redis Compartido">
+  <div class="img-cap">Figura 4: Monitor visual en Experimento B3: Persistencia centralizada con Redis; secuencia de contador global e incremental continua.</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_b4a}" alt="Monitor B4a Lenta Round Robin">
+  <div class="img-cap">Figura 5: Monitor visual en Experimento B4(a): Réplica lenta bajo Round Robin (recibe ~35% del tráfico a 2063 ms).</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_b4b}" alt="Monitor B4b Lenta Least Connections">
+  <div class="img-cap">Figura 6: Monitor visual en Experimento B4(b): Réplica lenta bajo Least Connections (tráfico redirigido al 98% a réplicas sanas).</div>
+</div>
+
+<div class="img-box">
   <img src="{img_alg}" alt="Comparativa de Algoritmos">
-  <div class="img-cap">Figura 1: Tráfico atendido en Experimento B4: Round Robin (ciego) vs. Least Connections (adaptativo).</div>
+  <div class="img-cap">Figura 7: Tráfico atendido en Experimento B4: Round Robin (ciego) vs. Least Connections (adaptativo).</div>
 </div>
 
 <h3>3.3 Parte C · Clúster y Orquestación con Kubernetes Kind (C1 – C8)</h3>
@@ -305,7 +342,7 @@ Se implementó la arquitectura en Amazon Web Services (Región Ohio <code>us-eas
 
 <div class="img-box">
   <img src="{img_hc}" alt="Configuración de Health Checks en AWS">
-  <div class="img-cap">Figura 2: Parámetros optimizados de Comprobación de Estado en AWS Target Group (Ruta /health, intervalo 10s, umbral 2).</div>
+  <div class="img-cap">Figura 8: Parámetros optimizados de Comprobación de Estado en AWS Target Group (Ruta /health, intervalo 10s, umbral 2).</div>
 </div>
 
 <div class="box">
@@ -321,7 +358,7 @@ Se implementó la arquitectura en Amazon Web Services (Región Ohio <code>us-eas
 
 <div class="img-box">
   <img src="{img_mon}" alt="Monitor Visual de Errores y Diagnóstico">
-  <div class="img-cap">Figura 3: Diagnóstico en Monitor Visual: Registro en tiempo real de peticiones HTTP y cuadros de control de tráfico.</div>
+  <div class="img-cap">Figura 9: Diagnóstico en Monitor Visual: Registro en tiempo real de peticiones HTTP y cuadros de control de tráfico.</div>
 </div>
 
 <h3>4.2 Análisis de Capacidad y Ley de Little (Prueba C4)</h3>
@@ -333,7 +370,7 @@ Al elevar los clientes simultáneos de 5 a 20 en una tarea Fargate con 0.25 vCPU
 
 <div class="img-box">
   <img src="{img_little}" alt="Ley de Little y Capacidad">
-  <div class="img-cap">Figura 4: Curva empírica de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).</div>
+  <div class="img-cap">Figura 10: Curva empírica de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).</div>
 </div>
 
 <div class="page-break"></div>

@@ -177,27 +177,40 @@ def create_report():
         "• Experimento A3 (Política de Reinicio): Al agregar --restart unless-stopped, Docker detectó la caída y reinició el contenedor en 2 segundos. Sin embargo, al consultar GET /, el contador volvió a empezar en 1. Esto comprobó el axioma arquitectónico: 'Lo que vive en memoria RAM del contenedor muere con él. Reiniciar no previene la pérdida de datos'."
     )
 
+    def add_fig(img_rel, caption, width=Inches(5.5)):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        full_path = os.path.join(base_dir, img_rel)
+        if os.path.exists(full_path):
+            p_img = doc.add_paragraph()
+            p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_picture(full_path, width=width)
+            p_cap = doc.add_paragraph()
+            p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            r_cap = p_cap.add_run(caption)
+            r_cap.font.size = Pt(8.5)
+            r_cap.font.italic = True
+
     h2 = doc.add_heading("3.2 Parte B · Réplicas, NGINX y Persistencia con Redis (B1 – B4)", level=2)
     h2.runs[0].font.color.rgb = DARK
 
     doc.add_paragraph(
         "Mediante Docker Compose se orquestaron 3 réplicas de la API, un balanceador NGINX en Capa 7 y un motor Redis para persistencia de estado.\n"
         "• B1 (Round Robin): NGINX distribuyó las peticiones equitativamente entre las 3 réplicas. El monitor visual confirmó cuadros de 3 colores alternándose.\n"
-        "• B2 (Tolerancia a Caídas: NGINX Bueno vs. Defectuoso): Se eliminó una réplica con 'docker kill lab-fallas-api-2'. Con nginx.conf configurado con 'max_fails=1' y 'proxy_next_upstream error timeout', se logró 0% de error visible: NGINX redirigió en milisegundos las peticiones a las réplicas sanas. En contraste, con nginx-defectuoso.conf (sin reintentos y max_fails=0), el usuario recibió un 33.3% de errores HTTP 504 Gateway Timeout.\n"
-        "• B3 (Estado Compartido en Redis): Al inyectar REDIS_URL=redis://redis:6379/0, el contador dejó de ser local a cada contenedor y pasó a ser centralizado. La secuencia fue rigurosamente continua (1, 2, 3... 9) entre las diferentes réplicas.\n"
-        "• B4 (Mitigación de Réplicas Lentas): Se inyectó latencia de 2 segundos mediante POST /lento. Con Round Robin, la réplica lenta siguió recibiendo el 33.3% del tráfico a pesar de tardar 2000 ms. Al activar 'least_conn;', NGINX redujo drásticamente el tráfico hacia dicha instancia (cayendo a un 4.2%), desviando el 95.8% hacia las réplicas sanas."
+        "• B2 (Tolerancia a Caídas: NGINX Bueno vs. Defectuoso): Se eliminó una réplica con 'docker kill lab-fallas-api-2'. Con nginx.conf configurado con 'max_fails=1' y 'proxy_next_upstream error timeout', se logró 0% de error visible: NGINX redirigió en milisegundos las peticiones a las réplicas sanas. En contraste, con nginx-defectuoso.conf (sin reintentos y max_fails=0), el usuario recibió un 33.7% de errores HTTP 504 Gateway Timeout (cuadritos rojos en el monitor).\n"
+        "• B3 (Estado Compartido en Redis): Al inyectar REDIS_URL=redis://redis:6379/0, el contador dejó de ser local a cada contenedor y pasó a ser centralizado. La secuencia fue rigurosamente continua (1, 2, 3... 100) entre las diferentes réplicas.\n"
+        "• B4 (Mitigación de Réplicas Lentas): Se inyectó latencia de 2 segundos mediante POST /lento. Con Round Robin, la réplica lenta siguió recibiendo el 35.3% del tráfico a pesar de tardar 2063 ms. Al activar 'least_conn;', NGINX redujo drásticamente el tráfico hacia dicha instancia (cayendo a un 1.9%), desviando el 98.1% hacia las réplicas sanas."
     )
 
+    # Insertar capturas del monitor Parte B
+    add_fig("docs/evidencias/monitor_B1_round_robin.png", "Figura 1: Monitor visual en Experimento B1: Round Robin con 3 réplicas alternándose equitativamente (0 errores).")
+    add_fig("docs/evidencias/monitor_B2a_failover_exitoso.png", "Figura 2: Monitor visual en Experimento B2(a): Failover exitoso con NGINX bueno tras 'docker kill lab-fallas-api-2' (0 errores).")
+    add_fig("docs/evidencias/monitor_B2b_nginx_defectuoso_rojos.png", "Figura 3: Monitor visual en Experimento B2(b): Configuración defectuosa sin reintentos; se observan 34 cuadros rojos (33.7% error 504).")
+    add_fig("docs/evidencias/monitor_B3_redis_compartido.png", "Figura 4: Monitor visual en Experimento B3: Persistencia centralizada con Redis; secuencia de contador global e incremental continua.")
+    add_fig("docs/evidencias/monitor_B4a_lenta_round_robin.png", "Figura 5: Monitor visual en Experimento B4(a): Réplica lenta bajo Round Robin (recibe ~35% del tráfico a 2063 ms).")
+    add_fig("docs/evidencias/monitor_B4b_lenta_least_conn.png", "Figura 6: Monitor visual en Experimento B4(b): Réplica lenta bajo Least Connections (tráfico redirigido al 98% a réplicas sanas).")
+
     # Insertar gráfico de algoritmos
-    if os.path.exists("docs/graficos/comparativa_algoritmos.png"):
-        p_img = doc.add_paragraph()
-        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_picture("docs/graficos/comparativa_algoritmos.png", width=Inches(5.8))
-        p_cap = doc.add_paragraph()
-        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r_cap = p_cap.add_run("Figura 1: Distribución de tráfico en Experimento B4: Round Robin (ciego) vs. Least Connections (adaptativo).")
-        r_cap.font.size = Pt(8.5)
-        r_cap.font.italic = True
+    add_fig("docs/graficos/comparativa_algoritmos.png", "Figura 7: Distribución de tráfico en Experimento B4: Round Robin (ciego) vs. Least Connections (adaptativo).", width=Inches(5.8))
 
     h2 = doc.add_heading("3.3 Parte C · Clúster y Orquestación con Kubernetes Kind (C1 – C8)", level=2)
     h2.runs[0].font.color.rgb = DARK
@@ -236,15 +249,7 @@ def create_report():
     )
 
     # Insertar imagen de target group health check
-    if os.path.exists("docs/evidencias/aws_target_group_health_check.png"):
-        p_img = doc.add_paragraph()
-        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_picture("docs/evidencias/aws_target_group_health_check.png", width=Inches(5.6))
-        p_cap = doc.add_paragraph()
-        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r_cap = p_cap.add_run("Figura 2: Configuración validada de Health Checks en AWS Target Group (Ruta /health, umbral 2, intervalo 10s).")
-        r_cap.font.size = Pt(8.5)
-        r_cap.font.italic = True
+    add_fig("docs/evidencias/aws_target_group_health_check.png", "Figura 8: Configuración validada de Health Checks en AWS Target Group (Ruta /health, umbral 2, intervalo 10s).", width=Inches(5.6))
 
     doc.add_paragraph(
         "✅ PUNTO DE CONTROL 2: Detección de Caída y Algoritmo de Menos Solicitudes Pendientes\n"
@@ -263,15 +268,7 @@ def create_report():
     )
 
     # Insertar imagen de monitor visual
-    if os.path.exists("docs/evidencias/monitor_errores_red.jpg"):
-        p_img = doc.add_paragraph()
-        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_picture("docs/evidencias/monitor_errores_red.jpg", width=Inches(5.4))
-        p_cap = doc.add_paragraph()
-        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r_cap = p_cap.add_run("Figura 3: Diagnóstico en Monitor Visual: Detección gráfica en tiempo real de peticiones HTTP y registro de errores de red.")
-        r_cap.font.size = Pt(8.5)
-        r_cap.font.italic = True
+    add_fig("docs/evidencias/monitor_errores_red.png", "Figura 9: Diagnóstico en Monitor Visual: Detección gráfica en tiempo real de peticiones HTTP y registro de errores de red.", width=Inches(5.4))
 
     h2 = doc.add_heading("4.2 Análisis de Capacidad y Ley de Little (Prueba Opcional C4)", level=2)
     h2.runs[0].font.color.rgb = DARK
@@ -285,15 +282,7 @@ def create_report():
         "Al escalar a 4 tareas, la capacidad elástica absorbió la carga reduciendo la latencia a solo 3 ms."
     )
 
-    if os.path.exists("docs/graficos/ley_de_little_escalabilidad.png"):
-        p_img = doc.add_paragraph()
-        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_picture("docs/graficos/ley_de_little_escalabilidad.png", width=Inches(5.5))
-        p_cap = doc.add_paragraph()
-        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        r_cap = p_cap.add_run("Figura 4: Curva empírica de degradación de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).")
-        r_cap.font.size = Pt(8.5)
-        r_cap.font.italic = True
+    add_fig("docs/graficos/ley_de_little_escalabilidad.png", "Figura 10: Curva empírica de degradación de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).", width=Inches(5.5))
 
     # ========================== 5. TABLA OFICIAL ==========================
     doc.add_page_break()
