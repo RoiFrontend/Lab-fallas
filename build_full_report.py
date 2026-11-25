@@ -179,8 +179,17 @@ def create_report():
 
     def add_fig(img_rel, caption, width=Inches(5.5)):
         base_dir = os.path.dirname(os.path.abspath(__file__))
-        full_path = os.path.join(base_dir, img_rel)
-        if os.path.exists(full_path):
+        candidates = [
+            os.path.join(base_dir, img_rel),
+            os.path.join(r"C:\Users\roger\Downloads\lab-fallas\lab-fallas", img_rel),
+            os.path.join(r"C:\Users\roger\Downloads\lab-fallas", img_rel)
+        ]
+        full_path = None
+        for c in candidates:
+            if os.path.exists(c):
+                full_path = c
+                break
+        if full_path and os.path.exists(full_path):
             p_img = doc.add_paragraph()
             p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
             doc.add_picture(full_path, width=width)
@@ -189,6 +198,9 @@ def create_report():
             r_cap = p_cap.add_run(caption)
             r_cap.font.size = Pt(8.5)
             r_cap.font.italic = True
+            print(f"[OK FIGURA] Insertada: {caption[:40]}... ({full_path})")
+        else:
+            print(f"[ERROR FIGURA] No se encontró: {img_rel}")
 
     h2 = doc.add_heading("3.2 Parte B · Réplicas, NGINX y Persistencia con Redis (B1 – B4)", level=2)
     h2.runs[0].font.color.rgb = DARK
@@ -209,7 +221,7 @@ def create_report():
     add_fig("docs/evidencias/monitor_B4a_lenta_round_robin.png", "Figura 5: Monitor visual en Experimento B4(a): Réplica lenta bajo Round Robin (recibe ~35% del tráfico a 2063 ms).")
     add_fig("docs/evidencias/monitor_B4b_lenta_least_conn.png", "Figura 6: Monitor visual en Experimento B4(b): Réplica lenta bajo Least Connections (tráfico redirigido al 98% a réplicas sanas).")
 
-    # Insertar gráfico de algoritmos
+    # Insertar gráfico de algoritmos (Figura 7)
     add_fig("docs/graficos/comparativa_algoritmos.png", "Figura 7: Distribución de tráfico en Experimento B4: Round Robin (ciego) vs. Least Connections (adaptativo).", width=Inches(5.8))
 
     h2 = doc.add_heading("3.3 Parte C · Clúster y Orquestación con Kubernetes Kind (C1 – C8)", level=2)
@@ -219,10 +231,16 @@ def create_report():
         "Se desplegó un clúster Kubernetes local de 3 nodos (1 control-plane y 2 workers) con Kind:\n"
         "• C3 (Autocuración de Pods): Al ejecutar 'kubectl delete pod', el Deployment recreó inmediatamente una réplica sustituta en 4 segundos, conservando en todo momento el estado deseado (replicas: 3).\n"
         "• C4 (Crash de Proceso): Al tumbar el proceso con POST /crash, kubelet reinició el contenedor registrando RESTARTS=1. A diferencia de NGINX, el Service de Kubernetes (Capa 4) no reintenta peticiones en vuelo, evidenciando la necesidad de balanceadores Capa 7 en el borde.\n"
-        "• C5 (Escalabilidad Elástica): Se escaló a 5 réplicas con 'kubectl scale'. El Service de Kubernetes descubrió dinámicamente los 2 nuevos pods sin requerir modificación alguna de archivos de configuración.\n"
+        "• C5 (Escalabilidad Elástica): Se escaló a 5 réplicas con 'kubectl scale'. El Service de Kubernetes descubrió dinámicamente los 2 nuevos pods sin requerir modificación alguna de archivos de configuración (mostrando 5 colores en el monitor).\n"
         "• C6 (Caída de Nodo Completo): Se detuvo el contenedor de nodo 'ais86-worker' (simulando corte de energía de un servidor físico). Al expirar la tolerancia (15 segundos), el plano de control marcó el nodo como NotReady y reprogramó automáticamente los pods afectados en el nodo worker2, restableciendo el 100% de la capacidad operativa.\n"
         "• C7 (Despliegue Roto y Rollback): Se inyectó ROMPER_HEALTH=1. El pod nuevo nunca alcanzó el estado Ready (0/1) debido al fallo de readinessProbe. Kubernetes impidió la sustitución de los 3 pods antiguos, garantizando cero tiempo fuera de servicio hasta que se ejecutó 'kubectl rollout undo'."
     )
+
+    # Insertar capturas del monitor Parte C (Kubernetes)
+    add_fig("docs/evidencias/monitor_C3_k8s_3replicas.png", "Figura 8: Monitor visual en Experimento C3: 3 Pods en Kubernetes Kind atendiendo en NodePort 30080 (0 errores).")
+    add_fig("docs/evidencias/monitor_C5_k8s_5replicas.png", "Figura 9: Monitor visual en Experimento C5: Escalamiento dinámico a 5 Pods con 5 colores distintos descubiertos por el Service (0 errores).")
+    add_fig("docs/evidencias/monitor_C6_k8s_nodo_caido.png", "Figura 10: Monitor visual en Experimento C6: Cuadros rojos en la ventana de detección al apagar el nodo worker (tolerancia de 15s) antes de la reprogramación.")
+    add_fig("docs/evidencias/monitor_C7_k8s_despliegue_roto.png", "Figura 11: Monitor visual en Experimento C7: Protección de despliegue progresivo (readinessProbe); los 3 pods sanos atienden con 0 errores.")
 
     # ========================== 4. GUIA 2 AWS ==========================
     doc.add_page_break()
@@ -249,7 +267,7 @@ def create_report():
     )
 
     # Insertar imagen de target group health check
-    add_fig("docs/evidencias/aws_target_group_health_check.png", "Figura 8: Configuración validada de Health Checks en AWS Target Group (Ruta /health, umbral 2, intervalo 10s).", width=Inches(5.6))
+    add_fig("docs/evidencias/aws_target_group_health_check.png", "Figura 12: Configuración validada de Health Checks en AWS Target Group (Ruta /health, umbral 2, intervalo 10s).", width=Inches(5.6))
 
     doc.add_paragraph(
         "✅ PUNTO DE CONTROL 2: Detección de Caída y Algoritmo de Menos Solicitudes Pendientes\n"
@@ -268,7 +286,7 @@ def create_report():
     )
 
     # Insertar imagen de monitor visual
-    add_fig("docs/evidencias/monitor_errores_red.png", "Figura 9: Diagnóstico en Monitor Visual: Detección gráfica en tiempo real de peticiones HTTP y registro de errores de red.", width=Inches(5.4))
+    add_fig("docs/evidencias/monitor_errores_red.png", "Figura 13: Diagnóstico en Monitor Visual: Detección gráfica en tiempo real de peticiones HTTP y registro de errores de red.", width=Inches(5.4))
 
     h2 = doc.add_heading("4.2 Análisis de Capacidad y Ley de Little (Prueba Opcional C4)", level=2)
     h2.runs[0].font.color.rgb = DARK
@@ -282,7 +300,7 @@ def create_report():
         "Al escalar a 4 tareas, la capacidad elástica absorbió la carga reduciendo la latencia a solo 3 ms."
     )
 
-    add_fig("docs/graficos/ley_de_little_escalabilidad.png", "Figura 10: Curva empírica de degradación de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).", width=Inches(5.5))
+    add_fig("docs/graficos/ley_de_little_escalabilidad.png", "Figura 14: Curva empírica de degradación de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).", width=Inches(5.5))
 
     # ========================== 5. TABLA OFICIAL ==========================
     doc.add_page_break()

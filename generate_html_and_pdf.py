@@ -20,6 +20,11 @@ img_b3 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidenci
 img_b4a = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B4a_lenta_round_robin.png")
 img_b4b = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_B4b_lenta_least_conn.png")
 
+img_c3 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_C3_k8s_3replicas.png")
+img_c5 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_C5_k8s_5replicas.png")
+img_c6 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_C6_k8s_nodo_caido.png")
+img_c7 = to_base64("c:/Users/roger/Downloads/lab-fallas/lab-fallas/docs/evidencias/monitor_C7_k8s_despliegue_roto.png")
+
 html_content = f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -315,11 +320,31 @@ Se levantó un clúster Kubernetes de 3 nodos (<code>ais86-control-plane</code>,
 <ul>
   <li><strong>C3 (Autocuración de Pods):</strong> Al borrar un pod, el Deployment creó de inmediato un sustituto en 4 segundos, conservando el estado deseado (<code>replicas: 3</code>).</li>
   <li><strong>C4 (Crash de Proceso):</strong> Al invocar <code>POST /crash</code>, kubelet reinició el contenedor (<code>RESTARTS: 1</code>).</li>
-  <li><strong>C5 (Escalado Dinámico):</strong> Al escalar a 5 réplicas (<code>kubectl scale</code>), el <code>Service</code> descubrió los 2 nuevos pods sin reiniciar el balanceador.</li>
+  <li><strong>C5 (Escalado Dinámico):</strong> Al escalar a 5 réplicas (<code>kubectl scale</code>), el <code>Service</code> descubrió los 2 nuevos pods sin reiniciar el balanceador, desplegando 5 colores distintos en el monitor.</li>
   <li><strong>C6 (Caída de Nodo Físico):</strong> Al detener el nodo <code>ais86-worker</code>, Kubernetes esperó 15 segundos (toleration), marcó el nodo como <code>NotReady</code> y reprogramó los pods en <code>ais86-worker2</code>.</li>
   <li><strong>C7 (Despliegue Roto y Rollback):</strong> Con <code>ROMPER_HEALTH=1</code>, el pod nuevo nunca pasó el <code>readinessProbe</code> (0/1). Kubernetes mantuvo intactos los 3 pods sanos, garantizando 0 errores en el monitor hasta ejecutar <code>kubectl rollout undo</code>.</li>
 </ul>
 </p>
+
+<div class="img-box">
+  <img src="{img_c3}" alt="Monitor C3 K8s 3 Replicas">
+  <div class="img-cap">Figura 8: Monitor visual en Experimento C3: 3 Pods en Kubernetes Kind atendiendo en NodePort 30080 (0 errores).</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_c5}" alt="Monitor C5 K8s 5 Replicas">
+  <div class="img-cap">Figura 9: Monitor visual en Experimento C5: Escalamiento dinámico a 5 Pods con 5 colores distintos descubiertos por el Service (0 errores).</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_c6}" alt="Monitor C6 K8s Nodo Caido">
+  <div class="img-cap">Figura 10: Monitor visual en Experimento C6: Cuadros rojos en la ventana de detección al apagar el nodo worker (tolerancia de 15s) antes de la reprogramación.</div>
+</div>
+
+<div class="img-box">
+  <img src="{img_c7}" alt="Monitor C7 K8s Despliegue Roto">
+  <div class="img-cap">Figura 11: Monitor visual en Experimento C7: Protección de despliegue progresivo (readinessProbe); los 3 pods sanos atienden con 0 errores.</div>
+</div>
 
 <div class="page-break"></div>
 
@@ -342,7 +367,7 @@ Se implementó la arquitectura en Amazon Web Services (Región Ohio <code>us-eas
 
 <div class="img-box">
   <img src="{img_hc}" alt="Configuración de Health Checks en AWS">
-  <div class="img-cap">Figura 8: Parámetros optimizados de Comprobación de Estado en AWS Target Group (Ruta /health, intervalo 10s, umbral 2).</div>
+  <div class="img-cap">Figura 12: Parámetros optimizados de Comprobación de Estado en AWS Target Group (Ruta /health, intervalo 10s, umbral 2).</div>
 </div>
 
 <div class="box">
@@ -358,7 +383,7 @@ Se implementó la arquitectura en Amazon Web Services (Región Ohio <code>us-eas
 
 <div class="img-box">
   <img src="{img_mon}" alt="Monitor Visual de Errores y Diagnóstico">
-  <div class="img-cap">Figura 9: Diagnóstico en Monitor Visual: Registro en tiempo real de peticiones HTTP y cuadros de control de tráfico.</div>
+  <div class="img-cap">Figura 13: Diagnóstico en Monitor Visual: Registro en tiempo real de peticiones HTTP y cuadros de control de tráfico.</div>
 </div>
 
 <h3>4.2 Análisis de Capacidad y Ley de Little (Prueba C4)</h3>
@@ -370,7 +395,7 @@ Al elevar los clientes simultáneos de 5 a 20 en una tarea Fargate con 0.25 vCPU
 
 <div class="img-box">
   <img src="{img_little}" alt="Ley de Little y Capacidad">
-  <div class="img-cap">Figura 10: Curva empírica de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).</div>
+  <div class="img-cap">Figura 14: Curva empírica de latencia según Ley de Little en Fargate (1 Tarea saturada vs. 4 Tareas escaladas).</div>
 </div>
 
 <div class="page-break"></div>

@@ -135,6 +135,26 @@ d32a5d752d48        1  2003  True
 
 ### 3.3 Parte C · Kubernetes con `kind` de 3 nodos (`C1`–`C8`)
 
+#### Capturas del Monitor Web en Kubernetes (`http://localhost:8090` → `http://localhost:30080/`)
+
+**1. Experimento C3 · Reconciliación y 3 Pods en Kubernetes:**  
+Distribución de tráfico a través del NodePort 30080 hacia los 3 pods del Deployment. 0 errores.
+![C3 Kubernetes 3 Pods](evidencias/monitor_C3_k8s_3replicas.png)
+
+**2. Experimento C5 · Escalamiento a 5 Réplicas (`kubectl scale`):**  
+Aparecen 2 nuevos colores en el monitor sin modificar la configuración del Service. Descubrimiento automático por etiquetas (`app: api`).
+![C5 Kubernetes 5 Pods](evidencias/monitor_C5_k8s_5replicas.png)
+
+**3. Experimento C6 · Caída de Nodo Worker (`docker stop ais86-worker`):**  
+Durante la ventana de tolerancia (15 s), el Service envía tráfico al nodo caído y se observan cuadros rojos temporales, antes de que el plano de control reprograme los pods en `ais86-worker2`.
+![C6 Kubernetes Caída de Nodo](evidencias/monitor_C6_k8s_nodo_caido.png)
+
+**4. Experimento C7 · Despliegue Roto (`ROMPER_HEALTH=1`) y Rollback:**  
+La estrategia de Rolling Update frena el despliegue al fallar la `readinessProbe`. Los 3 pods originales siguen atendiendo con 0 errores para el usuario.
+![C7 Kubernetes Despliegue Roto](evidencias/monitor_C7_k8s_despliegue_roto.png)
+
+#### Registro de Terminal (Logs Ejecutados)
+
 ```text
 === C3: Borrar pod api-78ccc9885b-lmrgt ===
 pod "api-78ccc9885b-lmrgt" deleted from default namespace
